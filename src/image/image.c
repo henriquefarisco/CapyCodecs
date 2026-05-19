@@ -12,6 +12,27 @@ static void capy_image_rgba32_reset(struct capy_image_rgba32 *image) {
   image->allocator.user_data = 0;
 }
 
+uint32_t capy_image_abi_version(void) { return CAPY_IMAGE_ABI_VERSION; }
+
+uint32_t capy_image_codec_features(void) {
+  return CAPY_IMAGE_FEATURE_BMP_DECODE | CAPY_IMAGE_FEATURE_PNG_DECODE |
+         CAPY_IMAGE_FEATURE_JPEG_DECODE | CAPY_IMAGE_FEATURE_ARGB32_OUTPUT |
+         CAPY_IMAGE_FEATURE_ALLOCATOR_INJECTION |
+         CAPY_IMAGE_FEATURE_PNG_INFLATER_INJECTION;
+}
+
+void capy_image_default_limits(struct capy_image_limits *limits) {
+  if (!limits) {
+    return;
+  }
+  limits->max_width = CAPY_IMAGE_MAX_WIDTH;
+  limits->max_height = CAPY_IMAGE_MAX_HEIGHT;
+  limits->max_output_bytes = (size_t)CAPY_IMAGE_MAX_WIDTH *
+                             (size_t)CAPY_IMAGE_MAX_HEIGHT *
+                             sizeof(uint32_t);
+  limits->max_temporary_bytes = limits->max_output_bytes;
+}
+
 void capy_image_rgba32_free(struct capy_image_rgba32 *image) {
   if (!image) {
     return;

@@ -37,61 +37,66 @@ int capy_bmp_decode_memory(const uint8_t *data, size_t size,
   size_t pixel_bytes;
 
   if (!out) {
-    return -1;
+    return CAPY_IMAGE_ERR_INVALID_ARGUMENT;
   }
   capy_image_rgba32_reset(out);
-  if (!data || !allocator || !allocator->alloc || !allocator->free ||
-      size < 54u) {
-    return -1;
+  if (!data || !allocator || !allocator->alloc || !allocator->free) {
+    return CAPY_IMAGE_ERR_INVALID_ARGUMENT;
+  }
+  if (size < 54u) {
+    return CAPY_IMAGE_ERR_TRUNCATED_DATA;
   }
 
   if (capy_bmp_u16le(data) != 0x4D42u) {
-    return -1;
+    return CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;
   }
   if (capy_bmp_u32le(data + 14u) < 40u) {
-    return -1;
+    return CAPY_IMAGE_ERR_CORRUPT_DATA;
   }
   if (capy_bmp_u16le(data + 26u) != 1u) {
-    return -1;
+    return CAPY_IMAGE_ERR_CORRUPT_DATA;
   }
   bpp = capy_bmp_u16le(data + 28u);
   if (bpp != 24u && bpp != 32u) {
-    return -1;
+    return CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;
   }
   if (capy_bmp_u32le(data + 30u) != 0u) {
-    return -1;
+    return CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;
   }
 
   width = capy_bmp_i32le(data + 18u);
   height = capy_bmp_i32le(data + 22u);
   bottom_up = height > 0 ? 1 : 0;
   if (height == INT32_MIN) {
-    return -1;
+    return CAPY_IMAGE_ERR_CORRUPT_DATA;
   }
   if (height < 0) {
     height = -height;
   }
-  if (width <= 0 || height <= 0 || (uint32_t)width > CAPY_IMAGE_MAX_WIDTH ||
+  if (width <= 0 || height <= 0) {
+    return CAPY_IMAGE_ERR_CORRUPT_DATA;
+  }
+  if ((uint32_t)width > CAPY_IMAGE_MAX_WIDTH ||
       (uint32_t)height > CAPY_IMAGE_MAX_HEIGHT) {
-    return -1;
+    return CAPY_IMAGE_ERR_RESOURCE_LIMIT;
   }
 
   row_size = ((bpp * (uint32_t)width + 31u) / 32u) * 4u;
   pixel_offset = capy_bmp_u32le(data + 10u);
   if (pixel_offset < 54u || pixel_offset >= size) {
-    return -1;
+    return CAPY_IMAGE_ERR_TRUNCATED_DATA;
   }
   pixel_bytes = (size_t)(uint32_t)width * (size_t)(uint32_t)height *
                 sizeof(uint32_t);
   if (pixel_bytes / sizeof(uint32_t) / (size_t)(uint32_t)width !=
       (size_t)(uint32_t)height) {
-    return -1;
+    return CAPY_IMAGE_ERR_RESOURCE_LIMIT;
   }
 
   out->pixels = (uint32_t *)allocator->alloc(pixel_bytes, allocator->user_data);
   if (!out->pixels) {
     capy_image_rgba32_reset(out);
-    return -1;
+    return CAPY_IMAGE_ERR_OUT_OF_MEMORY;
   }
   out->allocator = *allocator;
 
@@ -102,7 +107,7 @@ int capy_bmp_decode_memory(const uint8_t *data, size_t size,
     const uint8_t *row;
     if (row_offset > size || row_size > size - row_offset) {
       capy_image_rgba32_free(out);
-      return -1;
+      return CAPY_IMAGE_ERR_TRUNCATED_DATA;
     }
     row = data + row_offset;
     for (int32_t x = 0; x < width; ++x) {
@@ -115,5 +120,5 @@ int capy_bmp_decode_memory(const uint8_t *data, size_t size,
   out->width = (uint32_t)width;
   out->height = (uint32_t)height;
 
-  return 0;
+  return CAPY_IMAGE_OK;
 }

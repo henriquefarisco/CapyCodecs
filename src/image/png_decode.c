@@ -71,13 +71,13 @@ static int capy_png_idat_append(const struct capy_image_allocator *allocator,
                                 uint8_t **buf, size_t *len, size_t *cap,
                                 const uint8_t *chunk, size_t chunk_len) {
   if (!allocator || !allocator->alloc || !buf || !len || !cap || !chunk) {
-    return -1;
+    return CAPY_IMAGE_ERR_INVALID_ARGUMENT;
   }
   if (*len + chunk_len < *len) {
-    return -1;
+    return CAPY_IMAGE_ERR_RESOURCE_LIMIT;
   }
   if (*len + chunk_len > CAPY_PNG_MAX_RAW) {
-    return -1;
+    return CAPY_IMAGE_ERR_RESOURCE_LIMIT;
   }
   if (*len + chunk_len > *cap) {
     size_t needed = *len + chunk_len;
@@ -95,11 +95,11 @@ static int capy_png_idat_append(const struct capy_image_allocator *allocator,
       new_cap = CAPY_PNG_MAX_RAW;
     }
     if (new_cap < needed) {
-      return -1;
+      return CAPY_IMAGE_ERR_RESOURCE_LIMIT;
     }
     next = (uint8_t *)allocator->alloc(new_cap, allocator->user_data);
     if (!next) {
-      return -1;
+      return CAPY_IMAGE_ERR_OUT_OF_MEMORY;
     }
     if (*buf && *len) {
       capy_png_copy(next, *buf, *len);
@@ -222,18 +222,23 @@ int capy_png_decode_memory(const uint8_t *data, size_t size,
   size_t pos = 0u;
   uint8_t ihdr_seen = 0u;
   uint8_t idat_seen = 0u;
+  uint8_t iend_seen = 0u;
   int ok = 0;
+  int result = CAPY_IMAGE_ERR_CORRUPT_DATA;
 
   if (!out) {
-    return -1;
+    return CAPY_IMAGE_ERR_INVALID_ARGUMENT;
   }
   capy_png_rgba32_reset(out);
   if (!data || !allocator || !allocator->alloc || !allocator->free ||
-      !inflater || !inflater->inflate || size < CAPY_PNG_SIG_LEN) {
-    return -1;
+      !inflater || !inflater->inflate) {
+    return CAPY_IMAGE_ERR_INVALID_ARGUMENT;
+  }
+  if (size < CAPY_PNG_SIG_LEN) {
+    return CAPY_IMAGE_ERR_TRUNCATED_DATA;
   }
   if (!capy_png_mem_equal(data, capy_png_sig, CAPY_PNG_SIG_LEN)) {
-    return -1;
+    return CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;
   }
   pos = CAPY_PNG_SIG_LEN;
 
@@ -245,11 +250,13 @@ int capy_png_decode_memory(const uint8_t *data, size_t size,
     chunk_type = capy_png_u32be(data + pos);
     pos += 4u;
     if ((size_t)chunk_len > size - pos || 4u > size - pos - chunk_len) {
+      result = CAPY_IMAGE_ERR_TRUNCATED_DATA;
       goto done;
     }
     chunk_data = data + pos;
     if (chunk_type == 0x49484452u && chunk_len == 13u) {
       if (ihdr_seen || idat_seen) {
+        result = CAPY_IMAGE_ERR_CORRUPT_DATA;
         goto done;
       }
       width = capy_png_u32be(chunk_data);
@@ -262,30 +269,43 @@ int capy_png_decode_memory(const uint8_t *data, size_t size,
       ihdr_seen = 1u;
     } else if (chunk_type == 0x49444154u) {
       if (!ihdr_seen) {
+        result = CAPY_IMAGE_ERR_CORRUPT_DATA;
         goto done;
       }
-      if (capy_png_idat_append(allocator, &idat, &idat_len, &idat_cap,
-                               chunk_data, chunk_len) != 0) {
+      result = capy_png_idat_append(allocator, &idat, &idat_len, &idat_cap,
+                                    chunk_data, chunk_len);
+      if (result != CAPY_IMAGE_OK) {
         goto done;
       }
       idat_seen = 1u;
     } else if (chunk_type == 0x49454E44u) {
+      iend_seen = 1u;
       break;
     } else if (chunk_type == 0x504C5445u) {
       if (!ihdr_seen || idat_seen) {
+        result = CAPY_IMAGE_ERR_CORRUPT_DATA;
         goto done;
       }
     } else if ((chunk_type & 0x20000000u) == 0u) {
+      result = CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;
       goto done;
     }
     pos += (size_t)chunk_len + 4u;
   }
 
   channels = capy_png_channels(color_type);
-  if (width == 0u || height == 0u || width > CAPY_PNG_MAX_DIM ||
-      height > CAPY_PNG_MAX_DIM || bit_depth != 8u ||
-      compression_method != 0u || filter_method != 0u || interlace != 0u ||
-      channels == 0 || idat_len == 0u || !ihdr_seen) {
+  if (!ihdr_seen || !iend_seen || idat_len == 0u || width == 0u ||
+      height == 0u) {
+    result = CAPY_IMAGE_ERR_CORRUPT_DATA;
+    goto done;
+  }
+  if (width > CAPY_PNG_MAX_DIM || height > CAPY_PNG_MAX_DIM) {
+    result = CAPY_IMAGE_ERR_RESOURCE_LIMIT;
+    goto done;
+  }
+  if (bit_depth != 8u || compression_method != 0u || filter_method != 0u ||
+      interlace != 0u || channels == 0) {
+    result = CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;
     goto done;
   }
 
@@ -297,6 +317,7 @@ int capy_png_decode_memory(const uint8_t *data, size_t size,
     if (row_bytes / (size_t)channels != (size_t)width ||
         stride <= row_bytes || raw_size / stride != (size_t)height ||
         raw_size > CAPY_PNG_MAX_RAW) {
+      result = CAPY_IMAGE_ERR_RESOURCE_LIMIT;
       goto done;
     }
     raw = (uint8_t *)allocator->alloc(raw_size, allocator->user_data);
@@ -306,18 +327,21 @@ int capy_png_decode_memory(const uint8_t *data, size_t size,
         (size_t)width * (size_t)height * sizeof(uint32_t),
         allocator->user_data);
     if (!raw || !recon || !prev_recon || !pixels) {
+      result = CAPY_IMAGE_ERR_OUT_OF_MEMORY;
       goto done;
     }
     capy_png_zero(raw, raw_size);
     capy_png_zero(prev_recon, row_bytes);
     if (inflater->inflate(raw, &inflated, idat, idat_len,
                           inflater->user_data) != 0 || inflated != raw_size) {
+      result = CAPY_IMAGE_ERR_INFLATER_FAILED;
       goto done;
     }
     for (uint32_t y = 0u; y < height; ++y) {
       const uint8_t *row = raw + (size_t)y * stride;
       const uint8_t *prev = y > 0u ? prev_recon : 0;
       if (capy_png_reconstruct_row(recon, row, prev, row_bytes, channels) != 0) {
+        result = CAPY_IMAGE_ERR_CORRUPT_DATA;
         goto done;
       }
       for (uint32_t x = 0u; x < width; ++x) {
@@ -343,5 +367,5 @@ done:
   if (!ok) {
     capy_png_rgba32_reset(out);
   }
-  return ok ? 0 : -1;
+  return ok ? CAPY_IMAGE_OK : result;
 }

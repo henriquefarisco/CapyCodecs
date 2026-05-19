@@ -1,18 +1,7 @@
-# CapyCodecs validation
+# CapyCodecs validation moved
 
-CapyCodecs validation is host-side and portable.
+The authoritative validation documentation is now:
 
-Current coverage:
+[docs/20-validation/validation.md](20-validation/validation.md)
 
-- `tests/image/test_image_contracts.c`
-
-The current image-contract test covers:
-
-- allocator-injected free/reset behavior;
-- fail-closed invalid input behavior for BMP, PNG and JPEG entry points;
-- 1x1 BMP RGB decode through the portable API;
-- 1x1 PNG RGB decode through a fake inflater callback.
-
-The PNG test intentionally avoids zlib or CapyOS `tinf` wiring. Real compressed PNG fixtures belong in a later host-adapter slice.
-
-No repository-level build harness is defined here yet. Until one exists, compile this test externally with the image decoder sources and a host C compiler.
+This legacy path is kept as a compatibility stub for existing workflows and external references.

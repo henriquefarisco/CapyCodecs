@@ -1,6 +1,5 @@
 #include "capy_image.h"
 
-#define CAPY_JPEG_MAX_DIM 2048
 #define CAPY_JPEG_MAX_COMPS 3
 
 #define CAPY_JPEG_SOI 0xD8
@@ -394,8 +393,11 @@ static int capy_jpeg_parse_sof0(struct capy_jpeg_ctx *ctx, int seg_len) {
   ctx->height = capy_jpeg_read_u16(ctx);
   ctx->width = capy_jpeg_read_u16(ctx);
   ctx->ncomp = (uint8_t)capy_jpeg_read_byte(ctx);
+  if (ctx->width > CAPY_IMAGE_MAX_WIDTH ||
+      ctx->height > CAPY_IMAGE_MAX_HEIGHT) {
+    return -2;
+  }
   if (ctx->precision != 8 || ctx->width == 0 || ctx->height == 0 ||
-      ctx->width > CAPY_JPEG_MAX_DIM || ctx->height > CAPY_JPEG_MAX_DIM ||
       (ctx->ncomp != 1 && ctx->ncomp != 3) ||
       seg_len != 8 + (int)ctx->ncomp * 3) {
     return -1;
@@ -549,7 +551,7 @@ static int capy_jpeg_alloc_planes(struct capy_jpeg_ctx *ctx,
     if (ctx->comp[c].v_samp > max_v) max_v = ctx->comp[c].v_samp;
   }
   if (max_h == 0 || max_v == 0) {
-    return -1;
+    return CAPY_IMAGE_ERR_CORRUPT_DATA;
   }
   for (int c = 0; c < (int)ctx->ncomp; ++c) {
     int mcu_w = ctx->comp[c].h_samp * 8;
@@ -560,20 +562,20 @@ static int capy_jpeg_alloc_planes(struct capy_jpeg_ctx *ctx,
     int ph = (scaled_h + mcu_h - 1) / mcu_h * mcu_h;
     size_t bytes;
     if (pw <= 0 || ph <= 0) {
-      return -1;
+      return CAPY_IMAGE_ERR_CORRUPT_DATA;
     }
     bytes = (size_t)pw * (size_t)ph;
     if (bytes / (size_t)pw != (size_t)ph) {
-      return -1;
+      return CAPY_IMAGE_ERR_RESOURCE_LIMIT;
     }
     plane_ws[c] = pw;
     planes[c] = (uint8_t *)allocator->alloc(bytes, allocator->user_data);
     if (!planes[c]) {
-      return -1;
+      return CAPY_IMAGE_ERR_OUT_OF_MEMORY;
     }
     capy_jpeg_zero(planes[c], bytes);
   }
-  return 0;
+  return CAPY_IMAGE_OK;
 }
 
 static void capy_jpeg_assemble_grayscale(struct capy_jpeg_ctx *ctx,
@@ -621,20 +623,23 @@ int capy_jpeg_decode_memory(const uint8_t *data, size_t size,
   int got_sof = 0;
   int got_sos = 0;
   int ok = 0;
+  int result = CAPY_IMAGE_ERR_CORRUPT_DATA;
 
   if (!out) {
-    return -1;
+    return CAPY_IMAGE_ERR_INVALID_ARGUMENT;
   }
   capy_jpeg_rgba32_reset(out);
-  if (!data || !allocator || !allocator->alloc || !allocator->free ||
-      size < 2u) {
-    return -1;
+  if (!data || !allocator || !allocator->alloc || !allocator->free) {
+    return CAPY_IMAGE_ERR_INVALID_ARGUMENT;
+  }
+  if (size < 2u) {
+    return CAPY_IMAGE_ERR_TRUNCATED_DATA;
   }
   capy_jpeg_zero(&ctx, sizeof(ctx));
   ctx.data = data;
   ctx.len = size;
   if (data[0] != 0xFFu || data[1] != CAPY_JPEG_SOI) {
-    return -1;
+    return CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;
   }
   ctx.pos = 2u;
 
@@ -662,64 +667,109 @@ int capy_jpeg_decode_memory(const uint8_t *data, size_t size,
     }
     if (marker == CAPY_JPEG_SOF0) {
       int seg_len = (int)capy_jpeg_read_u16(&ctx);
-      if (got_sof || !capy_jpeg_segment_available(&ctx, seg_len) ||
-          capy_jpeg_parse_sof0(&ctx, seg_len) != 0) {
+      if (got_sof) {
+        result = CAPY_IMAGE_ERR_CORRUPT_DATA;
         goto done;
       }
+      if (!capy_jpeg_segment_available(&ctx, seg_len)) {
+        result = CAPY_IMAGE_ERR_TRUNCATED_DATA;
+        goto done;
+      }
+      {
+        int sof_result = capy_jpeg_parse_sof0(&ctx, seg_len);
+        if (sof_result == -2) {
+          result = CAPY_IMAGE_ERR_RESOURCE_LIMIT;
+          goto done;
+        }
+        if (sof_result != 0) {
+          result = CAPY_IMAGE_ERR_CORRUPT_DATA;
+          goto done;
+        }
+      }
       got_sof = 1;
-      if (capy_jpeg_alloc_planes(&ctx, allocator, planes, plane_ws) != 0) {
+      result = capy_jpeg_alloc_planes(&ctx, allocator, planes, plane_ws);
+      if (result != CAPY_IMAGE_OK) {
         goto done;
       }
     } else if (marker == CAPY_JPEG_DQT) {
       int seg_len = (int)capy_jpeg_read_u16(&ctx);
-      if (!capy_jpeg_segment_available(&ctx, seg_len) ||
-          capy_jpeg_parse_dqt(&ctx, seg_len) != 0) {
+      if (!capy_jpeg_segment_available(&ctx, seg_len)) {
+        result = CAPY_IMAGE_ERR_TRUNCATED_DATA;
+        goto done;
+      }
+      if (capy_jpeg_parse_dqt(&ctx, seg_len) != 0) {
+        result = CAPY_IMAGE_ERR_CORRUPT_DATA;
         goto done;
       }
     } else if (marker == CAPY_JPEG_DHT) {
       int seg_len = (int)capy_jpeg_read_u16(&ctx);
-      if (!capy_jpeg_segment_available(&ctx, seg_len) ||
-          capy_jpeg_parse_dht(&ctx, seg_len) != 0) {
+      if (!capy_jpeg_segment_available(&ctx, seg_len)) {
+        result = CAPY_IMAGE_ERR_TRUNCATED_DATA;
+        goto done;
+      }
+      if (capy_jpeg_parse_dht(&ctx, seg_len) != 0) {
+        result = CAPY_IMAGE_ERR_CORRUPT_DATA;
         goto done;
       }
     } else if (marker == CAPY_JPEG_DRI) {
       int seg_len = (int)capy_jpeg_read_u16(&ctx);
-      if (!capy_jpeg_segment_available(&ctx, seg_len) || seg_len != 4) {
+      if (!capy_jpeg_segment_available(&ctx, seg_len)) {
+        result = CAPY_IMAGE_ERR_TRUNCATED_DATA;
+        goto done;
+      }
+      if (seg_len != 4) {
+        result = CAPY_IMAGE_ERR_CORRUPT_DATA;
         goto done;
       }
       ctx.restart_interval = capy_jpeg_read_u16(&ctx);
     } else if (marker == CAPY_JPEG_SOS) {
       int seg_len;
       if (ctx.pos + 2u > ctx.len) {
+        result = CAPY_IMAGE_ERR_TRUNCATED_DATA;
         goto done;
       }
       seg_len = ((int)ctx.data[ctx.pos] << 8) | (int)ctx.data[ctx.pos + 1u];
-      if (!got_sof || seg_len < 2 || (size_t)seg_len > ctx.len - ctx.pos ||
-          capy_jpeg_parse_sos(&ctx, planes, plane_ws) != 0) {
+      if (!got_sof || seg_len < 2) {
+        result = CAPY_IMAGE_ERR_CORRUPT_DATA;
+        goto done;
+      }
+      if ((size_t)seg_len > ctx.len - ctx.pos) {
+        result = CAPY_IMAGE_ERR_TRUNCATED_DATA;
+        goto done;
+      }
+      if (capy_jpeg_parse_sos(&ctx, planes, plane_ws) != 0) {
+        result = CAPY_IMAGE_ERR_CORRUPT_DATA;
         goto done;
       }
       got_sos = 1;
       break;
+    } else if (marker == CAPY_JPEG_SOF2 ||
+               (marker >= 0xC0u && marker <= 0xCFu)) {
+      result = CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;
+      goto done;
     } else if ((marker >= CAPY_JPEG_APP0 && marker <= CAPY_JPEG_APP15) ||
-               marker == CAPY_JPEG_COM || marker == CAPY_JPEG_SOF2 ||
-               (marker >= 0xC0u && marker <= 0xFEu)) {
+               marker == CAPY_JPEG_COM) {
       int seg_len = (int)capy_jpeg_read_u16(&ctx);
       if (!capy_jpeg_segment_available(&ctx, seg_len)) {
+        result = CAPY_IMAGE_ERR_TRUNCATED_DATA;
         goto done;
       }
       ctx.pos += (size_t)(seg_len - 2);
     } else {
+      result = CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;
       goto done;
     }
   }
 
   if (!got_sof || !got_sos || !planes[0]) {
+    result = CAPY_IMAGE_ERR_CORRUPT_DATA;
     goto done;
   }
   pixels = (uint32_t *)allocator->alloc(
       (size_t)ctx.width * (size_t)ctx.height * sizeof(uint32_t),
       allocator->user_data);
   if (!pixels) {
+    result = CAPY_IMAGE_ERR_OUT_OF_MEMORY;
     goto done;
   }
   if (ctx.ncomp == 1) {
@@ -742,5 +792,5 @@ done:
   if (!ok) {
     capy_jpeg_rgba32_reset(out);
   }
-  return ok ? 0 : -1;
+  return ok ? CAPY_IMAGE_OK : result;
 }

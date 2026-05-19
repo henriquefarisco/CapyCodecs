@@ -2,64 +2,69 @@
 
 CapyCodecs owns portable media codec cores for CapyOS and related projects.
 
-## Current migration
+## CapyOS reference version
 
-Migrated from CapyOS:
+Pinned for this release: `0.8.0-alpha.240+20260519`. Update this section together with `docs/10-contracts/compatibility.md` whenever the CapyOS core version, ABI or canonical manifest format changes.
 
-- `CapyOS/include/gui/bmp_loader.h`
-- `CapyOS/src/gui/core/bmp_loader.c`
-- `CapyOS/include/gui/png_loader.h`
-- `CapyOS/src/gui/core/png_loader.c`
-- `CapyOS/include/gui/jpeg_loader.h`
-- `CapyOS/src/gui/core/jpeg_loader.c`
+Cross-repo authoritative references:
 
-Created here:
+- `CapyOS/docs/reference/integration/compatibility-matrix.md`
+- `CapyOS/docs/reference/integration/capypkg-publisher-manifest-format.md`
+- `CapyOS/docs/operations/manual-module-deploy-runbook.md`
 
-- `src/image/capy_image.h`
-- `src/image/image.c`
-- `src/image/bmp_decode.c`
-- `src/image/png_decode.c`
-- `src/image/jpeg_decode.c`
-- `tests/image/test_image_contracts.c`
-- `docs/validation.md`
-- `docs/compatibility.md`
+## Documentation map
 
-## Boundary
+Read the documentation in numeric order when onboarding or planning larger changes.
 
-CapyCodecs owns:
+### 00 Overview
 
-- byte-to-pixel/sample decode logic;
-- deterministic error returns;
-- resource limits;
-- allocator-injected memory ownership;
-- golden/fuzz fixtures in future slices.
+- [Project boundary](00-overview/project-boundary.md)
+- [Migration status](00-overview/migration-status.md)
 
-CapyOS owns:
+### 10 Contracts
 
-- file and network IO;
-- kernel allocation wrappers;
-- rendering and audio backends;
-- sandbox policy;
-- UI error reporting.
+- [Compatibility and integration contract](10-contracts/compatibility.md)
+- [Image ABI contract](10-contracts/image-abi.md)
+- [Dependency boundaries](10-contracts/dependency-boundaries.md)
 
-## Tag-release compatibility model
+### 20 Validation
 
-Early alpha releases use GitHub release tags plus a compatibility index without certificate/signature enforcement. The minimum metadata required for a release is:
+- [Validation](20-validation/validation.md)
+- [Test strategy](20-validation/test-strategy.md)
+- [Fuzzing and security](20-validation/fuzzing-and-security.md)
 
-- component id;
-- tag;
-- artifact name;
-- sha256;
-- required CapyOS ABI versions;
-- dependencies;
-- permissions.
+### 30 Roadmap
 
-Signature enforcement is intentionally deferred until the release pipeline and trust-store design are active.
+- [CapyCodecs development plan](30-roadmap/codecs-development-plan.md)
+- [Delivery sequence](30-roadmap/delivery-sequence.md)
+- [Status tracking](30-roadmap/status-tracking.md)
 
-## Next slices
+### 40 Implementation
 
-1. Add repository-level host test harness.
-2. Add golden BMP/PNG/JPEG fixtures.
-3. Add truncated/corrupt image fixtures.
-4. Add PNG inflater adapters in each host.
-5. Add CapyOS codec adapter when Etapas 6-7 permit integration.
+- [Image codec implementation guide](40-implementation/image-codecs.md)
+- [Audio codec implementation guide](40-implementation/audio-codecs.md)
+- [Video codec implementation guide](40-implementation/video-codecs.md)
+- [Container codec implementation guide](40-implementation/container-codecs.md)
+- [Release engineering](40-implementation/release-engineering.md)
+
+## Core rule
+
+CapyCodecs decodes encoded media bytes into pixels, samples, frames or packets. CapyOS owns IO, sandboxing, rendering, audio output, installation and rollback.
+
+## Current checkpoint
+
+The current image ABI hardening checkpoint covers:
+
+- modular host-side image contract tests;
+- golden BMP, PNG and JPEG baseline fixtures;
+- fail-closed negative fixtures for BMP, PNG and JPEG;
+- allocator failure matrix coverage for current golden fixtures;
+- PNG inflater failure coverage;
+- public dimension-limit rejection for BMP, PNG and JPEG.
+
+## Current compatibility stubs
+
+The legacy paths below remain available as compatibility stubs:
+
+- [Legacy compatibility path](compatibility.md)
+- [Legacy validation path](validation.md)
