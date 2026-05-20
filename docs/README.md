@@ -4,7 +4,7 @@ CapyCodecs owns portable media codec cores for CapyOS and related projects.
 
 ## CapyOS reference version
 
-Pinned for this release: `0.8.0-alpha.240+20260519`. Update this section together with `docs/10-contracts/compatibility.md` whenever the CapyOS core version, ABI or canonical manifest format changes.
+Pinned for this release: `0.8.0-alpha.241+20260519`. Update this section together with `docs/10-contracts/compatibility.md` whenever the CapyOS core version, ABI or canonical manifest format changes.
 
 Cross-repo authoritative references:
 
