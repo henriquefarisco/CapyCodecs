@@ -1,6 +1,6 @@
 # Security Policy
 
-CapyCodecs 0.0.3 is an early service release. Report security issues privately to the repository owner before opening public issues.
+CapyCodecs 0.0.4 is an early service release. Report security issues privately to the repository owner before opening public issues.
 
 ## Release gate
 
