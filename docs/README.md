@@ -4,7 +4,7 @@ CapyCodecs owns portable media codec cores for CapyOS and related projects.
 
 ## CapyOS reference version
 
-Pinned for this release: `0.8.0-alpha.241+20260519`. Update this section together with `docs/10-contracts/compatibility.md` whenever the CapyOS core version, ABI or canonical manifest format changes.
+Pinned for this release: `0.8.0-alpha.244+20260520`. The authoritative cross-repo compatibility contract for CapyCodecs lives at [`compatibility.md`](compatibility.md) at the docs root; the hierarchical `docs/10-contracts/`, `docs/20-validation/`, `docs/30-roadmap/` and `docs/40-implementation/` trees keep the deep technical detail (image ABI, validation strategy, roadmap, implementation guides). Update the root file together with this section whenever the CapyOS core version, ABI or canonical manifest format changes.
 
 Cross-repo authoritative references:
 
@@ -23,9 +23,10 @@ Read the documentation in numeric order when onboarding or planning larger chang
 
 ### 10 Contracts
 
-- [Compatibility and integration contract](10-contracts/compatibility.md)
+- [Compatibility and integration contract (authoritative)](compatibility.md)
 - [Image ABI contract](10-contracts/image-abi.md)
 - [Dependency boundaries](10-contracts/dependency-boundaries.md)
+- [Legacy compatibility detail (historical mirror)](10-contracts/compatibility.md)
 
 ### 20 Validation
 
@@ -62,9 +63,7 @@ The current image ABI hardening checkpoint covers:
 - PNG inflater failure coverage;
 - public dimension-limit rejection for BMP, PNG and JPEG.
 
-## Current compatibility stubs
+## Current compatibility paths
 
-The legacy paths below remain available as compatibility stubs:
-
-- [Legacy compatibility path](compatibility.md)
-- [Legacy validation path](validation.md)
+- [Authoritative compatibility contract](compatibility.md) — pins CapyOS core, ABI, manifest format and adapter limits.
+- [Legacy validation stub](validation.md) — points to `20-validation/validation.md` for the full coverage tables.
