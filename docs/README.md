@@ -4,7 +4,7 @@ CapyCodecs owns portable media codec cores for CapyOS and related projects.
 
 ## CapyOS reference version
 
-Pinned for this release: `0.8.0-alpha.244+20260520`. The authoritative cross-repo compatibility contract for CapyCodecs lives at [`compatibility.md`](compatibility.md) at the docs root; the hierarchical `docs/10-contracts/`, `docs/20-validation/`, `docs/30-roadmap/` and `docs/40-implementation/` trees keep the deep technical detail (image ABI, validation strategy, roadmap, implementation guides). Update the root file together with this section whenever the CapyOS core version, ABI or canonical manifest format changes.
+Pinned for this release: `0.8.0-alpha.261+20260529`. The authoritative cross-repo compatibility contract for CapyCodecs lives at [`compatibility.md`](compatibility.md) at the docs root; the hierarchical `docs/10-contracts/`, `docs/20-validation/`, `docs/30-roadmap/` and `docs/40-implementation/` trees keep the deep technical detail (image ABI, validation strategy, roadmap, implementation guides). Update the root file together with this section whenever the CapyOS core version, ABI or canonical manifest format changes.
 
 Cross-repo authoritative references:
 

@@ -24,7 +24,7 @@ CapyCodecs currently contains the first portable image codec slice migrated out 
 
 ## Current state
 
-- **Version:** `0.0.5`.
+- **Version:** `0.0.6`.
 - **Owned ABI:** `capy-codec-image`.
 - **Implemented entry points:** BMP, PNG and JPEG memory decoders.
 - **Current validation gate:** `make validate`.
