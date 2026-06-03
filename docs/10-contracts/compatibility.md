@@ -18,11 +18,15 @@ CapyCodecs modules must remain portable codec cores with no CapyOS kernel depend
 
 ## Owned ABI
 
-CapyCodecs currently owns the `capy-codec-image` ABI for image decoding.
+CapyCodecs currently owns the `capy-codec-image` ABI for image decoding
+(`CAPY_IMAGE_ABI_VERSION` = `2`; see the root `docs/compatibility.md`
+for the authoritative detail).
 
 This ABI covers:
 
-- decoder entry points;
+- decoder entry points (default-limit `capy_*_decode_memory` plus the
+  per-call `capy_*_decode_memory_limited` variants that take a
+  `capy_image_limits`);
 - `capy_image_rgba32` output ownership;
 - allocator injection;
 - PNG inflater injection;

@@ -185,3 +185,122 @@ void test_resource_limits(void) {
   test_jpeg_resource_limit_case((uint16_t)(CAPY_IMAGE_MAX_WIDTH + 1u), 1u);
   test_jpeg_resource_limit_case(1u, (uint16_t)(CAPY_IMAGE_MAX_HEIGHT + 1u));
 }
+
+static void test_bmp_per_call_case(uint32_t width, uint32_t height,
+                                   uint32_t max_w, uint32_t max_h,
+                                   int expect_limit) {
+  uint8_t bmp[54];
+  struct test_heap heap;
+  struct capy_image_allocator allocator;
+  struct capy_image_limits limits;
+  struct capy_image_rgba32 image;
+  int rc;
+  test_make_bmp_header(bmp, width, height);
+  test_heap_reset(&heap);
+  allocator = test_allocator(&heap);
+  capy_image_default_limits(&limits);
+  limits.max_width = max_w;
+  limits.max_height = max_h;
+  test_poison_image(&image, allocator);
+  rc = capy_bmp_decode_memory_limited(bmp, sizeof(bmp), &allocator, &limits,
+                                      &image);
+  if (expect_limit) {
+    TEST_EXPECT(rc == CAPY_IMAGE_ERR_RESOURCE_LIMIT);
+    TEST_EXPECT(heap.alloc_calls == 0);
+    test_expect_reset(&image);
+  } else {
+    TEST_EXPECT(rc != CAPY_IMAGE_ERR_RESOURCE_LIMIT);
+  }
+  TEST_EXPECT(heap.free_calls == heap.alloc_calls);
+}
+
+static void test_png_per_call_case(uint32_t width, uint32_t height,
+                                   uint32_t max_w, uint32_t max_h,
+                                   int expect_limit) {
+  uint8_t png[64];
+  size_t png_size;
+  struct test_heap heap;
+  struct capy_image_allocator allocator;
+  struct capy_image_inflater inflater;
+  struct test_inflater_state inflater_state;
+  struct capy_image_limits limits;
+  struct capy_image_rgba32 image;
+  int rc;
+  png_size = test_make_png_header(png, width, height);
+  test_heap_reset(&heap);
+  allocator = test_allocator(&heap);
+  inflater_state.calls = 0;
+  inflater.inflate = test_inflate_rgb_1x1;
+  inflater.user_data = &inflater_state;
+  capy_image_default_limits(&limits);
+  limits.max_width = max_w;
+  limits.max_height = max_h;
+  test_poison_image(&image, allocator);
+  rc = capy_png_decode_memory_limited(png, png_size, &allocator, &inflater,
+                                      &limits, &image);
+  if (expect_limit) {
+    TEST_EXPECT(rc == CAPY_IMAGE_ERR_RESOURCE_LIMIT);
+    test_expect_reset(&image);
+  } else {
+    TEST_EXPECT(rc != CAPY_IMAGE_ERR_RESOURCE_LIMIT);
+  }
+  TEST_EXPECT(heap.free_calls == heap.alloc_calls);
+}
+
+static void test_jpeg_per_call_case(uint16_t width, uint16_t height,
+                                    uint32_t max_w, uint32_t max_h,
+                                    int expect_limit) {
+  uint8_t jpeg[32];
+  size_t jpeg_size;
+  struct test_heap heap;
+  struct capy_image_allocator allocator;
+  struct capy_image_limits limits;
+  struct capy_image_rgba32 image;
+  int rc;
+  jpeg_size = test_make_jpeg_sof0(jpeg, width, height);
+  test_heap_reset(&heap);
+  allocator = test_allocator(&heap);
+  capy_image_default_limits(&limits);
+  limits.max_width = max_w;
+  limits.max_height = max_h;
+  test_poison_image(&image, allocator);
+  rc = capy_jpeg_decode_memory_limited(jpeg, jpeg_size, &allocator, &limits,
+                                       &image);
+  if (expect_limit) {
+    TEST_EXPECT(rc == CAPY_IMAGE_ERR_RESOURCE_LIMIT);
+    TEST_EXPECT(heap.alloc_calls == 0);
+    test_expect_reset(&image);
+  } else {
+    TEST_EXPECT(rc != CAPY_IMAGE_ERR_RESOURCE_LIMIT);
+  }
+  TEST_EXPECT(heap.free_calls == heap.alloc_calls);
+}
+
+static void test_bmp_null_limits_uses_defaults(void) {
+  uint8_t bmp[54];
+  struct test_heap heap;
+  struct capy_image_allocator allocator;
+  struct capy_image_rgba32 image;
+  test_make_bmp_header(bmp, CAPY_IMAGE_MAX_WIDTH + 1u, 1u);
+  test_heap_reset(&heap);
+  allocator = test_allocator(&heap);
+  test_poison_image(&image, allocator);
+  TEST_EXPECT(capy_bmp_decode_memory_limited(bmp, sizeof(bmp), &allocator, 0,
+                                             &image) ==
+              CAPY_IMAGE_ERR_RESOURCE_LIMIT);
+  test_expect_reset(&image);
+  TEST_EXPECT(heap.alloc_calls == 0);
+}
+
+void test_per_call_limits(void) {
+  /* A tight per-call limit rejects an image the defaults would accept. */
+  test_bmp_per_call_case(2u, 2u, 1u, 16u, 1);
+  test_png_per_call_case(2000u, 1u, 512u, 512u, 1);
+  test_jpeg_per_call_case(2000u, 1u, 512u, 512u, 1);
+  /* A relaxed limit accepts dimensions above the former PNG 1024 hard cap. */
+  test_bmp_per_call_case(2u, 2u, 4u, 4u, 0);
+  test_png_per_call_case(2000u, 1u, 4096u, 4096u, 0);
+  test_jpeg_per_call_case(2000u, 1u, 4096u, 4096u, 0);
+  /* NULL limits fall back to the documented defaults. */
+  test_bmp_null_limits_uses_defaults();
+}

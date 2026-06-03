@@ -7,12 +7,18 @@ void test_image_abi_contract(void) {
   capy_image_default_limits(&limits);
   features = capy_image_codec_features();
   TEST_EXPECT(capy_image_abi_version() == CAPY_IMAGE_ABI_VERSION);
+  TEST_EXPECT(capy_image_abi_version() >= 2u);
   TEST_EXPECT((features & CAPY_IMAGE_FEATURE_BMP_DECODE) != 0u);
   TEST_EXPECT((features & CAPY_IMAGE_FEATURE_PNG_DECODE) != 0u);
   TEST_EXPECT((features & CAPY_IMAGE_FEATURE_JPEG_DECODE) != 0u);
   TEST_EXPECT((features & CAPY_IMAGE_FEATURE_ARGB32_OUTPUT) != 0u);
   TEST_EXPECT((features & CAPY_IMAGE_FEATURE_ALLOCATOR_INJECTION) != 0u);
   TEST_EXPECT((features & CAPY_IMAGE_FEATURE_PNG_INFLATER_INJECTION) != 0u);
+  TEST_EXPECT((features & CAPY_IMAGE_FEATURE_PER_CALL_LIMITS) != 0u);
+  TEST_EXPECT((features & CAPY_IMAGE_FEATURE_DETECT) != 0u);
+  TEST_EXPECT((features & CAPY_IMAGE_FEATURE_GENERIC_DECODE) != 0u);
+  TEST_EXPECT((features & CAPY_IMAGE_FEATURE_METADATA) != 0u);
+  TEST_EXPECT((features & CAPY_IMAGE_FEATURE_QOI_DECODE) != 0u);
   TEST_EXPECT(limits.max_width == CAPY_IMAGE_MAX_WIDTH);
   TEST_EXPECT(limits.max_height == CAPY_IMAGE_MAX_HEIGHT);
   TEST_EXPECT(limits.max_output_bytes == (size_t)CAPY_IMAGE_MAX_WIDTH *

@@ -25,9 +25,10 @@ static void capy_image_rgba32_reset(struct capy_image_rgba32 *image) {
   image->allocator.user_data = 0;
 }
 
-int capy_bmp_decode_memory(const uint8_t *data, size_t size,
-                           const struct capy_image_allocator *allocator,
-                           struct capy_image_rgba32 *out) {
+int capy_bmp_decode_memory_limited(const uint8_t *data, size_t size,
+                                   const struct capy_image_allocator *allocator,
+                                   const struct capy_image_limits *limits,
+                                   struct capy_image_rgba32 *out) {
   int32_t width;
   int32_t height;
   int bottom_up;
@@ -35,6 +36,7 @@ int capy_bmp_decode_memory(const uint8_t *data, size_t size,
   uint32_t row_size;
   uint32_t pixel_offset;
   size_t pixel_bytes;
+  struct capy_image_limits eff;
 
   if (!out) {
     return CAPY_IMAGE_ERR_INVALID_ARGUMENT;
@@ -42,6 +44,11 @@ int capy_bmp_decode_memory(const uint8_t *data, size_t size,
   capy_image_rgba32_reset(out);
   if (!data || !allocator || !allocator->alloc || !allocator->free) {
     return CAPY_IMAGE_ERR_INVALID_ARGUMENT;
+  }
+  if (limits) {
+    eff = *limits;
+  } else {
+    capy_image_default_limits(&eff);
   }
   if (size < 54u) {
     return CAPY_IMAGE_ERR_TRUNCATED_DATA;
@@ -76,8 +83,8 @@ int capy_bmp_decode_memory(const uint8_t *data, size_t size,
   if (width <= 0 || height <= 0) {
     return CAPY_IMAGE_ERR_CORRUPT_DATA;
   }
-  if ((uint32_t)width > CAPY_IMAGE_MAX_WIDTH ||
-      (uint32_t)height > CAPY_IMAGE_MAX_HEIGHT) {
+  if ((uint32_t)width > eff.max_width ||
+      (uint32_t)height > eff.max_height) {
     return CAPY_IMAGE_ERR_RESOURCE_LIMIT;
   }
 
@@ -90,6 +97,9 @@ int capy_bmp_decode_memory(const uint8_t *data, size_t size,
                 sizeof(uint32_t);
   if (pixel_bytes / sizeof(uint32_t) / (size_t)(uint32_t)width !=
       (size_t)(uint32_t)height) {
+    return CAPY_IMAGE_ERR_RESOURCE_LIMIT;
+  }
+  if (pixel_bytes > eff.max_output_bytes) {
     return CAPY_IMAGE_ERR_RESOURCE_LIMIT;
   }
 
@@ -121,4 +131,12 @@ int capy_bmp_decode_memory(const uint8_t *data, size_t size,
   out->height = (uint32_t)height;
 
   return CAPY_IMAGE_OK;
+}
+
+int capy_bmp_decode_memory(const uint8_t *data, size_t size,
+                           const struct capy_image_allocator *allocator,
+                           struct capy_image_rgba32 *out) {
+  struct capy_image_limits limits;
+  capy_image_default_limits(&limits);
+  return capy_bmp_decode_memory_limited(data, size, allocator, &limits, out);
 }

@@ -17,10 +17,13 @@ The image test suite is organized into focused files:
 - `tests/image/test_alloc_failures.c`
 - `tests/image/test_inflater_failures.c`
 - `tests/image/test_limits.c`
+- `tests/image/test_detect.c`
+- `tests/image/test_metadata.c`
+- `tests/image/test_qoi.c`
 
 Planned next test files:
 
-- `tests/image/test_detect.c`
+- `tests/image/test_ico.c` (when the next additive new format lands)
 
 ## Golden fixtures
 
@@ -105,7 +108,7 @@ Resource tests should cover:
 - animation frame limit exhaustion;
 - metadata size limit exhaustion.
 
-Initial resource-limit coverage is implemented in `tests/image/test_limits.c` for BMP, PNG and JPEG dimensions above the public defaults.
+Initial resource-limit coverage is implemented in `tests/image/test_limits.c` for BMP, PNG and JPEG dimensions above the public defaults, plus per-call enforcement through the `capy_*_decode_memory_limited` entry points (tight limit rejects, relaxed limit accepts above the former PNG `1024` cap, and NULL `limits` falls back to defaults). Output-byte and temporary-byte budgets are enforced before large allocations; deeper integer-overflow corpus cases remain pending.
 
 ## Host adapter tests
 

@@ -4,7 +4,7 @@ CapyCodecs owns portable media codec cores for CapyOS and related projects.
 
 ## CapyOS reference version
 
-Pinned for this release: `0.8.0-alpha.261+20260529`. The authoritative cross-repo compatibility contract for CapyCodecs lives at [`compatibility.md`](compatibility.md) at the docs root; the hierarchical `docs/10-contracts/`, `docs/20-validation/`, `docs/30-roadmap/` and `docs/40-implementation/` trees keep the deep technical detail (image ABI, validation strategy, roadmap, implementation guides). Update the root file together with this section whenever the CapyOS core version, ABI or canonical manifest format changes.
+Pinned for this release: `0.8.0-alpha.262+20260602`. The authoritative cross-repo compatibility contract for CapyCodecs lives at [`compatibility.md`](compatibility.md) at the docs root; the hierarchical `docs/10-contracts/`, `docs/20-validation/`, `docs/30-roadmap/` and `docs/40-implementation/` trees keep the deep technical detail (image ABI, validation strategy, roadmap, implementation guides). Update the root file together with this section whenever the CapyOS core version, ABI or canonical manifest format changes.
 
 Cross-repo authoritative references:
 
@@ -61,7 +61,11 @@ The current image ABI hardening checkpoint covers:
 - fail-closed negative fixtures for BMP, PNG and JPEG;
 - allocator failure matrix coverage for current golden fixtures;
 - PNG inflater failure coverage;
-- public dimension-limit rejection for BMP, PNG and JPEG.
+- public dimension-limit rejection for BMP, PNG and JPEG;
+- per-call resource limits (`capy_*_decode_memory_limited`, `CAPY_IMAGE_ABI_VERSION` = `2`), with PNG honouring caller dimension/temporary budgets instead of a fixed internal cap;
+- format detection (`capy_image_detect_memory`) and generic decode dispatch (`capy_image_decode_memory`) for BMP/PNG/JPEG;
+- header-only metadata query (`capy_image_query_memory`) reporting format, dimensions, channels, bit depth and alpha without decoding;
+- QOI decode (`capy_qoi_decode_memory`) wired into detection, generic decode and metadata.
 
 ## Current compatibility paths
 

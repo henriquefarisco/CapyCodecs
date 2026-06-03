@@ -19,5 +19,12 @@ int main(void) {
   test_allocator_failure_matrix();
   test_png_inflater_failures();
   test_resource_limits();
+  test_per_call_limits();
+  test_detect_formats();
+  test_generic_decode();
+  test_metadata_query();
+  test_metadata_decode_consistency();
+  test_qoi_decode();
+  test_qoi_failures();
   return test_failures == 0 ? 0 : 1;
 }

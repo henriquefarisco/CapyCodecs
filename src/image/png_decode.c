@@ -1,9 +1,6 @@
 #include "capy_image.h"
 
 #define CAPY_PNG_SIG_LEN 8u
-#define CAPY_PNG_MAX_DIM 1024u
-#define CAPY_PNG_MAX_PIXELS (CAPY_PNG_MAX_DIM * CAPY_PNG_MAX_DIM)
-#define CAPY_PNG_MAX_RAW (CAPY_PNG_MAX_PIXELS * 5u)
 
 static const uint8_t capy_png_sig[CAPY_PNG_SIG_LEN] = {
     0x89u, 0x50u, 0x4Eu, 0x47u, 0x0Du, 0x0Au, 0x1Au, 0x0Au};
@@ -69,14 +66,15 @@ static void capy_png_free_temp(const struct capy_image_allocator *allocator,
 
 static int capy_png_idat_append(const struct capy_image_allocator *allocator,
                                 uint8_t **buf, size_t *len, size_t *cap,
-                                const uint8_t *chunk, size_t chunk_len) {
+                                const uint8_t *chunk, size_t chunk_len,
+                                size_t max_bytes) {
   if (!allocator || !allocator->alloc || !buf || !len || !cap || !chunk) {
     return CAPY_IMAGE_ERR_INVALID_ARGUMENT;
   }
   if (*len + chunk_len < *len) {
     return CAPY_IMAGE_ERR_RESOURCE_LIMIT;
   }
-  if (*len + chunk_len > CAPY_PNG_MAX_RAW) {
+  if (*len + chunk_len > max_bytes) {
     return CAPY_IMAGE_ERR_RESOURCE_LIMIT;
   }
   if (*len + chunk_len > *cap) {
@@ -91,8 +89,8 @@ static int capy_png_idat_append(const struct capy_image_allocator *allocator,
       }
       new_cap = grown;
     }
-    if (new_cap > CAPY_PNG_MAX_RAW) {
-      new_cap = CAPY_PNG_MAX_RAW;
+    if (new_cap > max_bytes) {
+      new_cap = max_bytes;
     }
     if (new_cap < needed) {
       return CAPY_IMAGE_ERR_RESOURCE_LIMIT;
@@ -200,10 +198,11 @@ static void capy_png_write_pixel(uint32_t *pixels, uint32_t index,
                   ((uint32_t)g << 8) | (uint32_t)b;
 }
 
-int capy_png_decode_memory(const uint8_t *data, size_t size,
-                           const struct capy_image_allocator *allocator,
-                           const struct capy_image_inflater *inflater,
-                           struct capy_image_rgba32 *out) {
+int capy_png_decode_memory_limited(const uint8_t *data, size_t size,
+                                   const struct capy_image_allocator *allocator,
+                                   const struct capy_image_inflater *inflater,
+                                   const struct capy_image_limits *limits,
+                                   struct capy_image_rgba32 *out) {
   uint32_t width = 0u;
   uint32_t height = 0u;
   uint8_t bit_depth = 0u;
@@ -225,6 +224,7 @@ int capy_png_decode_memory(const uint8_t *data, size_t size,
   uint8_t iend_seen = 0u;
   int ok = 0;
   int result = CAPY_IMAGE_ERR_CORRUPT_DATA;
+  struct capy_image_limits eff;
 
   if (!out) {
     return CAPY_IMAGE_ERR_INVALID_ARGUMENT;
@@ -233,6 +233,11 @@ int capy_png_decode_memory(const uint8_t *data, size_t size,
   if (!data || !allocator || !allocator->alloc || !allocator->free ||
       !inflater || !inflater->inflate) {
     return CAPY_IMAGE_ERR_INVALID_ARGUMENT;
+  }
+  if (limits) {
+    eff = *limits;
+  } else {
+    capy_image_default_limits(&eff);
   }
   if (size < CAPY_PNG_SIG_LEN) {
     return CAPY_IMAGE_ERR_TRUNCATED_DATA;
@@ -267,13 +272,18 @@ int capy_png_decode_memory(const uint8_t *data, size_t size,
       filter_method = chunk_data[11];
       interlace = chunk_data[12];
       ihdr_seen = 1u;
+      if (width > eff.max_width || height > eff.max_height) {
+        result = CAPY_IMAGE_ERR_RESOURCE_LIMIT;
+        goto done;
+      }
     } else if (chunk_type == 0x49444154u) {
       if (!ihdr_seen) {
         result = CAPY_IMAGE_ERR_CORRUPT_DATA;
         goto done;
       }
       result = capy_png_idat_append(allocator, &idat, &idat_len, &idat_cap,
-                                    chunk_data, chunk_len);
+                                    chunk_data, chunk_len,
+                                    eff.max_temporary_bytes);
       if (result != CAPY_IMAGE_OK) {
         goto done;
       }
@@ -299,10 +309,6 @@ int capy_png_decode_memory(const uint8_t *data, size_t size,
     result = CAPY_IMAGE_ERR_CORRUPT_DATA;
     goto done;
   }
-  if (width > CAPY_PNG_MAX_DIM || height > CAPY_PNG_MAX_DIM) {
-    result = CAPY_IMAGE_ERR_RESOURCE_LIMIT;
-    goto done;
-  }
   if (bit_depth != 8u || compression_method != 0u || filter_method != 0u ||
       interlace != 0u || channels == 0) {
     result = CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;
@@ -313,19 +319,23 @@ int capy_png_decode_memory(const uint8_t *data, size_t size,
     size_t row_bytes = (size_t)width * (size_t)channels;
     size_t stride = row_bytes + 1u;
     size_t raw_size = stride * (size_t)height;
+    size_t out_bytes = (size_t)width * (size_t)height * sizeof(uint32_t);
     size_t inflated = raw_size;
     if (row_bytes / (size_t)channels != (size_t)width ||
         stride <= row_bytes || raw_size / stride != (size_t)height ||
-        raw_size > CAPY_PNG_MAX_RAW) {
+        raw_size > eff.max_temporary_bytes) {
+      result = CAPY_IMAGE_ERR_RESOURCE_LIMIT;
+      goto done;
+    }
+    if (out_bytes / sizeof(uint32_t) / (size_t)width != (size_t)height ||
+        out_bytes > eff.max_output_bytes) {
       result = CAPY_IMAGE_ERR_RESOURCE_LIMIT;
       goto done;
     }
     raw = (uint8_t *)allocator->alloc(raw_size, allocator->user_data);
     recon = (uint8_t *)allocator->alloc(row_bytes, allocator->user_data);
     prev_recon = (uint8_t *)allocator->alloc(row_bytes, allocator->user_data);
-    pixels = (uint32_t *)allocator->alloc(
-        (size_t)width * (size_t)height * sizeof(uint32_t),
-        allocator->user_data);
+    pixels = (uint32_t *)allocator->alloc(out_bytes, allocator->user_data);
     if (!raw || !recon || !prev_recon || !pixels) {
       result = CAPY_IMAGE_ERR_OUT_OF_MEMORY;
       goto done;
@@ -368,4 +378,14 @@ done:
     capy_png_rgba32_reset(out);
   }
   return ok ? CAPY_IMAGE_OK : result;
+}
+
+int capy_png_decode_memory(const uint8_t *data, size_t size,
+                           const struct capy_image_allocator *allocator,
+                           const struct capy_image_inflater *inflater,
+                           struct capy_image_rgba32 *out) {
+  struct capy_image_limits limits;
+  capy_image_default_limits(&limits);
+  return capy_png_decode_memory_limited(data, size, allocator, inflater,
+                                        &limits, out);
 }

@@ -18,7 +18,10 @@ uint32_t capy_image_codec_features(void) {
   return CAPY_IMAGE_FEATURE_BMP_DECODE | CAPY_IMAGE_FEATURE_PNG_DECODE |
          CAPY_IMAGE_FEATURE_JPEG_DECODE | CAPY_IMAGE_FEATURE_ARGB32_OUTPUT |
          CAPY_IMAGE_FEATURE_ALLOCATOR_INJECTION |
-         CAPY_IMAGE_FEATURE_PNG_INFLATER_INJECTION;
+         CAPY_IMAGE_FEATURE_PNG_INFLATER_INJECTION |
+         CAPY_IMAGE_FEATURE_PER_CALL_LIMITS | CAPY_IMAGE_FEATURE_DETECT |
+         CAPY_IMAGE_FEATURE_GENERIC_DECODE | CAPY_IMAGE_FEATURE_METADATA |
+         CAPY_IMAGE_FEATURE_QOI_DECODE;
 }
 
 void capy_image_default_limits(struct capy_image_limits *limits) {
@@ -30,7 +33,13 @@ void capy_image_default_limits(struct capy_image_limits *limits) {
   limits->max_output_bytes = (size_t)CAPY_IMAGE_MAX_WIDTH *
                              (size_t)CAPY_IMAGE_MAX_HEIGHT *
                              sizeof(uint32_t);
-  limits->max_temporary_bytes = limits->max_output_bytes;
+  /* Worst-case temporary buffer is a PNG raw scanline pass: one filter byte
+     per row plus four bytes per pixel across the maximum image. This stays at
+     or above max_output_bytes so callers that decode a max-size RGBA PNG are
+     not rejected by the temporary budget. */
+  limits->max_temporary_bytes =
+      ((size_t)CAPY_IMAGE_MAX_WIDTH * sizeof(uint32_t) + 1u) *
+      (size_t)CAPY_IMAGE_MAX_HEIGHT;
 }
 
 void capy_image_rgba32_free(struct capy_image_rgba32 *image) {

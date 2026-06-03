@@ -15,11 +15,11 @@ remain portable codec cores with no CapyOS kernel dependency.
 
 ## CapyOS reference version
 
-- CapyOS core pinned for this contract: `0.8.0-alpha.261+20260529`
+- CapyOS core pinned for this contract: `0.8.0-alpha.262+20260602`
 - Authoritative cross-repo matrix: [`CapyOS/docs/reference/integration/compatibility-matrix.md`](../../CapyOS/docs/reference/integration/compatibility-matrix.md)
 - Canonical manifest format consumed by the in-tree adapter: [`CapyOS/docs/reference/integration/capypkg-publisher-manifest-format.md`](../../CapyOS/docs/reference/integration/capypkg-publisher-manifest-format.md)
 - Manual deploy runbook: [`CapyOS/docs/operations/manual-module-deploy-runbook.md`](../../CapyOS/docs/operations/manual-module-deploy-runbook.md)
-- Current cross-repo audit: [`CapyOS/docs/reference/integration/compatibility-audit-2026-05-23.md`](../../CapyOS/docs/reference/integration/compatibility-audit-2026-05-23.md)
+- Current cross-repo audit: [`CapyOS/docs/reference/integration/compatibility-audit-2026-06-02.md`](../../CapyOS/docs/reference/integration/compatibility-audit-2026-06-02.md)
 
 ## Authoritative CapyOS references
 
@@ -40,16 +40,34 @@ remain portable codec cores with no CapyOS kernel dependency.
 
 ## Owned ABI
 
-CapyCodecs currently owns the `capy-codec-image` ABI (v1).
+CapyCodecs currently owns the `capy-codec-image` ABI (v2).
 
 This ABI covers:
 
-- decoder entry points (`capy_image_*`);
+- decoder entry points (`capy_image_*`), including the default-limit
+  `capy_{bmp,png,jpeg,qoi}_decode_memory` and the per-call
+  `capy_{bmp,png,jpeg,qoi}_decode_memory_limited` variants that accept a
+  caller-provided `capy_image_limits`;
+- format detection (`capy_image_detect_memory` + `enum capy_image_format`,
+  covering BMP/PNG/JPEG/QOI) and generic decode dispatch
+  (`capy_image_decode_memory`);
+- header-only metadata query (`capy_image_query_memory` +
+  `struct capy_image_metadata`);
 - `capy_image_rgba32` output ownership;
 - allocator injection (no `malloc`/`kalloc`/global heap);
 - PNG inflater injection (no direct CapyOS `tinf` dependency);
 - ARGB32 pixel contract;
 - deterministic error returns.
+
+`CAPY_IMAGE_ABI_VERSION` moved from `1` to `2` additively. The v1
+entry points keep their signatures (now thin wrappers that pass the
+default limits) and new feature bits advertise the additions:
+`CAPY_IMAGE_FEATURE_PER_CALL_LIMITS` for the limited variants,
+`CAPY_IMAGE_FEATURE_DETECT` for magic-byte detection,
+`CAPY_IMAGE_FEATURE_GENERIC_DECODE` for the generic dispatcher,
+`CAPY_IMAGE_FEATURE_METADATA` for the header-only metadata query and
+`CAPY_IMAGE_FEATURE_QOI_DECODE` for the QOI codec. A NULL `limits`
+argument is treated as "use `capy_image_default_limits`".
 
 Audio and video ABIs will be added in `capy-codec-audio` / `capy-codec-video`
 when Etapa 10 opens.
@@ -106,12 +124,22 @@ the host on bad input.
 
 | Limit | Default value | Owner / configuration |
 |---|---|---|
-| Maximum image dimension (width × height) | configurable per call (alpha cap: 16384 × 16384) | caller via `capy_image_limits` |
-| Maximum decoded pixel count | configurable (alpha cap: 64 Mpx) | caller via `capy_image_limits` |
+| Maximum image dimension (width × height) | `4096 × 4096` default; configurable per call (alpha cap: 16384 × 16384) | caller via `capy_image_limits` |
+| Maximum decoded output bytes | `max_width × max_height × 4` (≈ 64 MiB at default dims) | caller via `capy_image_limits.max_output_bytes` |
+| Maximum temporary bytes | `(max_width × 4 + 1) × max_height` (worst-case PNG scanline pass) | caller via `capy_image_limits.max_temporary_bytes` |
 | Maximum memory budget per decode | configurable; bounded by injected allocator | caller |
 | Maximum decode time per call | not enforced inside codec; caller responsible for budget via cooperative cancellation | caller |
 | Allowed pixel format output | ARGB32 (8/8/8/8) | CapyCodecs ABI |
 | Audio sample format (future) | TBD when Etapa 10 opens | CapyCodecs / CapyOS |
+
+All four `capy_image_limits` fields are enforced before any large
+allocation. The default-limit `capy_*_decode_memory` wrappers apply
+`capy_image_default_limits`; callers that need tighter or looser
+budgets use the `capy_*_decode_memory_limited` entry points. PNG no
+longer carries a separate internal `1024 × 1024` cap — it honours the
+caller-provided dimension and temporary-byte budgets like BMP and
+JPEG. Limits are never used to silently downscale; overruns reject
+with `CAPY_IMAGE_ERR_RESOURCE_LIMIT`.
 
 ## Install/update boundary
 

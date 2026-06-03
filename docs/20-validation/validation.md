@@ -18,6 +18,9 @@ Current coverage is compiled into `build/test_image_contracts` from focused imag
 - `tests/image/test_alloc_failures.c`
 - `tests/image/test_inflater_failures.c`
 - `tests/image/test_limits.c`
+- `tests/image/test_detect.c`
+- `tests/image/test_metadata.c`
+- `tests/image/test_qoi.c`
 
 The current image-contract test covers:
 
@@ -32,7 +35,12 @@ The current image-contract test covers:
 - negative BMP, PNG and JPEG fixtures for truncated data, invalid magic and unsupported modes;
 - allocator failure matrix for BMP, PNG and JPEG golden fixtures;
 - PNG inflater callback failure and short-output failure behavior;
-- resource-limit rejection for BMP, PNG and JPEG dimensions above the public defaults.
+- resource-limit rejection for BMP, PNG and JPEG dimensions above the public defaults;
+- per-call limit enforcement through the `capy_*_decode_memory_limited` entry points: a tight limit rejects an otherwise-acceptable image, a relaxed limit accepts dimensions above the former PNG `1024` cap, and a NULL `limits` argument falls back to the documented defaults;
+- format detection (`capy_image_detect_memory`) for BMP/PNG/JPEG magic, unknown/too-short prefixes and NULL arguments;
+- generic decode dispatch (`capy_image_decode_memory`) routing BMP/PNG/JPEG/QOI to the limited entry points, plus fail-closed reset on unsupported magic and on a missing PNG inflater;
+- header-only metadata query (`capy_image_query_memory`) reporting format/dimensions/channels/bit-depth/alpha for BMP/PNG/JPEG/QOI golden fixtures, zeroing metadata on unsupported/truncated/progressive headers and NULL arguments, plus query/decode dimension consistency;
+- QOI decode (`capy_qoi_decode_memory`) with exact per-pixel checks across the RGB, RGBA, RUN, DIFF, LUMA and INDEX operations, plus fail-closed truncated-header, wrong-magic, corrupt end-marker, dimension-limit, truncated-stream and allocator-failure cases.
 
 The PNG test intentionally avoids zlib or CapyOS `tinf` wiring. Real compressed PNG fixtures belong in a later host-adapter slice.
 

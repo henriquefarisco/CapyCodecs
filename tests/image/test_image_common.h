@@ -50,5 +50,12 @@ void test_negative_jpeg_fixtures(void);
 void test_allocator_failure_matrix(void);
 void test_png_inflater_failures(void);
 void test_resource_limits(void);
+void test_per_call_limits(void);
+void test_detect_formats(void);
+void test_generic_decode(void);
+void test_metadata_query(void);
+void test_metadata_decode_consistency(void);
+void test_qoi_decode(void);
+void test_qoi_failures(void);
 
 #endif

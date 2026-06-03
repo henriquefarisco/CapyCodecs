@@ -3,8 +3,8 @@ CFLAGS ?= -std=c11 -Wall -Wextra -Werror -pedantic -O2 -g
 CPPFLAGS ?=
 LDFLAGS ?=
 BUILD_DIR := build
-SRC := src/image/image.c src/image/bmp_decode.c src/image/png_decode.c src/image/jpeg_decode.c
-TEST_SRC := tests/image/test_image_contracts.c tests/image/test_image_common.c tests/image/test_image_abi.c tests/image/test_image_lifecycle.c tests/image/test_bmp.c tests/image/test_png.c tests/image/test_jpeg.c tests/image/test_golden.c tests/image/test_negative.c tests/image/test_alloc_failures.c tests/image/test_inflater_failures.c tests/image/test_limits.c
+SRC := src/image/image.c src/image/bmp_decode.c src/image/png_decode.c src/image/jpeg_decode.c src/image/detect.c src/image/metadata.c src/image/qoi_decode.c
+TEST_SRC := tests/image/test_image_contracts.c tests/image/test_image_common.c tests/image/test_image_abi.c tests/image/test_image_lifecycle.c tests/image/test_bmp.c tests/image/test_png.c tests/image/test_jpeg.c tests/image/test_golden.c tests/image/test_negative.c tests/image/test_alloc_failures.c tests/image/test_inflater_failures.c tests/image/test_limits.c tests/image/test_detect.c tests/image/test_metadata.c tests/image/test_qoi.c
 TEST_BIN := $(BUILD_DIR)/test_image_contracts
 
 # capypkg packaging (Etapa 9 alpha)
@@ -35,14 +35,14 @@ test: $(TEST_BIN)
 lint:
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsyntax-only $(SRC) $(TEST_SRC)
 	git diff --check
-	test "$$(cat VERSION)" = "0.0.6"
+	test "$$(cat VERSION)" = "0.0.7"
 
 security:
 	$(CC) $(CPPFLAGS) $(CFLAGS) -D_FORTIFY_SOURCE=2 -fstack-protector-strong -fPIE -fsyntax-only $(SRC)
 
 version-check:
-	test "$$(cat VERSION)" = "0.0.6"
-	grep -q "Version: 0.0.6" README.md
+	test "$$(cat VERSION)" = "0.0.7"
+	grep -q "Version: 0.0.7" README.md
 
 validate: lint security test version-check
 

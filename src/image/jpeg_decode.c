@@ -63,6 +63,7 @@ struct capy_jpeg_ctx {
   const uint8_t *data;
   size_t len;
   size_t pos;
+  const struct capy_image_limits *limits;
   uint32_t width;
   uint32_t height;
   uint8_t precision;
@@ -393,8 +394,8 @@ static int capy_jpeg_parse_sof0(struct capy_jpeg_ctx *ctx, int seg_len) {
   ctx->height = capy_jpeg_read_u16(ctx);
   ctx->width = capy_jpeg_read_u16(ctx);
   ctx->ncomp = (uint8_t)capy_jpeg_read_byte(ctx);
-  if (ctx->width > CAPY_IMAGE_MAX_WIDTH ||
-      ctx->height > CAPY_IMAGE_MAX_HEIGHT) {
+  if (ctx->width > ctx->limits->max_width ||
+      ctx->height > ctx->limits->max_height) {
     return -2;
   }
   if (ctx->precision != 8 || ctx->width == 0 || ctx->height == 0 ||
@@ -565,7 +566,8 @@ static int capy_jpeg_alloc_planes(struct capy_jpeg_ctx *ctx,
       return CAPY_IMAGE_ERR_CORRUPT_DATA;
     }
     bytes = (size_t)pw * (size_t)ph;
-    if (bytes / (size_t)pw != (size_t)ph) {
+    if (bytes / (size_t)pw != (size_t)ph ||
+        bytes > ctx->limits->max_temporary_bytes) {
       return CAPY_IMAGE_ERR_RESOURCE_LIMIT;
     }
     plane_ws[c] = pw;
@@ -613,10 +615,12 @@ static void capy_jpeg_assemble_ycbcr(struct capy_jpeg_ctx *ctx,
   }
 }
 
-int capy_jpeg_decode_memory(const uint8_t *data, size_t size,
-                            const struct capy_image_allocator *allocator,
-                            struct capy_image_rgba32 *out) {
+int capy_jpeg_decode_memory_limited(const uint8_t *data, size_t size,
+                                    const struct capy_image_allocator *allocator,
+                                    const struct capy_image_limits *limits,
+                                    struct capy_image_rgba32 *out) {
   struct capy_jpeg_ctx ctx;
+  struct capy_image_limits eff;
   uint8_t *planes[CAPY_JPEG_MAX_COMPS] = {0, 0, 0};
   int plane_ws[CAPY_JPEG_MAX_COMPS] = {0, 0, 0};
   uint32_t *pixels = 0;
@@ -632,12 +636,18 @@ int capy_jpeg_decode_memory(const uint8_t *data, size_t size,
   if (!data || !allocator || !allocator->alloc || !allocator->free) {
     return CAPY_IMAGE_ERR_INVALID_ARGUMENT;
   }
+  if (limits) {
+    eff = *limits;
+  } else {
+    capy_image_default_limits(&eff);
+  }
   if (size < 2u) {
     return CAPY_IMAGE_ERR_TRUNCATED_DATA;
   }
   capy_jpeg_zero(&ctx, sizeof(ctx));
   ctx.data = data;
   ctx.len = size;
+  ctx.limits = &eff;
   if (data[0] != 0xFFu || data[1] != CAPY_JPEG_SOI) {
     return CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;
   }
@@ -765,9 +775,17 @@ int capy_jpeg_decode_memory(const uint8_t *data, size_t size,
     result = CAPY_IMAGE_ERR_CORRUPT_DATA;
     goto done;
   }
-  pixels = (uint32_t *)allocator->alloc(
-      (size_t)ctx.width * (size_t)ctx.height * sizeof(uint32_t),
-      allocator->user_data);
+  {
+    size_t out_bytes =
+        (size_t)ctx.width * (size_t)ctx.height * sizeof(uint32_t);
+    if (out_bytes / sizeof(uint32_t) / (size_t)ctx.width !=
+            (size_t)ctx.height ||
+        out_bytes > eff.max_output_bytes) {
+      result = CAPY_IMAGE_ERR_RESOURCE_LIMIT;
+      goto done;
+    }
+    pixels = (uint32_t *)allocator->alloc(out_bytes, allocator->user_data);
+  }
   if (!pixels) {
     result = CAPY_IMAGE_ERR_OUT_OF_MEMORY;
     goto done;
@@ -793,4 +811,12 @@ done:
     capy_jpeg_rgba32_reset(out);
   }
   return ok ? CAPY_IMAGE_OK : result;
+}
+
+int capy_jpeg_decode_memory(const uint8_t *data, size_t size,
+                            const struct capy_image_allocator *allocator,
+                            struct capy_image_rgba32 *out) {
+  struct capy_image_limits limits;
+  capy_image_default_limits(&limits);
+  return capy_jpeg_decode_memory_limited(data, size, allocator, &limits, out);
 }
