@@ -18,6 +18,8 @@
 #define CAPY_IMAGE_FEATURE_GENERIC_DECODE 0x00000100u
 #define CAPY_IMAGE_FEATURE_METADATA 0x00000200u
 #define CAPY_IMAGE_FEATURE_QOI_DECODE 0x00000400u
+#define CAPY_IMAGE_FEATURE_STRERROR 0x00000800u
+#define CAPY_IMAGE_FEATURE_FORMAT_NAME 0x00001000u
 
 enum capy_image_error {
   CAPY_IMAGE_OK = 0,
@@ -120,6 +122,17 @@ int capy_image_decode_memory(const uint8_t *data, size_t size,
                              struct capy_image_rgba32 *out);
 int capy_image_query_memory(const uint8_t *data, size_t size,
                             struct capy_image_metadata *out_meta);
+/* Stable, human-readable English description of a capy_image_error code
+ * (POSIX-strerror style). Always returns a non-NULL static string, including
+ * for unknown/out-of-range codes, so callers (e.g. the Image Viewer app) can
+ * print it unconditionally. ASCII-only; advertised by CAPY_IMAGE_FEATURE_STRERROR. */
+const char *capy_image_strerror(enum capy_image_error err);
+/* Stable, short ASCII name of a detected image format ("BMP", "PNG", "JPEG",
+ * "QOI", or "unknown" for CAPY_IMAGE_FORMAT_UNKNOWN / out-of-range). Always
+ * non-NULL, so the Image Viewer / generic decode path can label the format
+ * after capy_image_detect_memory or capy_image_query_memory. Advertised by
+ * CAPY_IMAGE_FEATURE_FORMAT_NAME. */
+const char *capy_image_format_name(enum capy_image_format format);
 void capy_image_rgba32_free(struct capy_image_rgba32 *image);
 
 #endif

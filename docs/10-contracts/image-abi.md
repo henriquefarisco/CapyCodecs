@@ -25,6 +25,8 @@ The ABI currently includes (`CAPY_IMAGE_ABI_VERSION` = `2`):
 - `capy_image_detect_memory`
 - `capy_image_decode_memory`
 - `capy_image_query_memory`
+- `capy_image_strerror`
+- `capy_image_format_name`
 - `capy_image_rgba32_free`
 - `struct capy_image_allocator`
 - `struct capy_image_inflater`

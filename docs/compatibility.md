@@ -57,7 +57,11 @@ This ABI covers:
 - allocator injection (no `malloc`/`kalloc`/global heap);
 - PNG inflater injection (no direct CapyOS `tinf` dependency);
 - ARGB32 pixel contract;
-- deterministic error returns.
+- deterministic error returns;
+- human-readable error strings (`capy_image_strerror`, advertised by
+  `CAPY_IMAGE_FEATURE_STRERROR`);
+- short format names (`capy_image_format_name`, advertised by
+  `CAPY_IMAGE_FEATURE_FORMAT_NAME`).
 
 `CAPY_IMAGE_ABI_VERSION` moved from `1` to `2` additively. The v1
 entry points keep their signatures (now thin wrappers that pass the
@@ -66,8 +70,10 @@ default limits) and new feature bits advertise the additions:
 `CAPY_IMAGE_FEATURE_DETECT` for magic-byte detection,
 `CAPY_IMAGE_FEATURE_GENERIC_DECODE` for the generic dispatcher,
 `CAPY_IMAGE_FEATURE_METADATA` for the header-only metadata query and
-`CAPY_IMAGE_FEATURE_QOI_DECODE` for the QOI codec. A NULL `limits`
-argument is treated as "use `capy_image_default_limits`".
+`CAPY_IMAGE_FEATURE_QOI_DECODE` for the QOI codec and
+`CAPY_IMAGE_FEATURE_STRERROR` for the `capy_image_strerror` error-string
+helper and `CAPY_IMAGE_FEATURE_FORMAT_NAME` for the `capy_image_format_name`
+helper. A NULL `limits` argument is treated as "use `capy_image_default_limits`".
 
 Audio and video ABIs will be added in `capy-codec-audio` / `capy-codec-video`
 when Etapa 10 opens.
