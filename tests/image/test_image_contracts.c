@@ -9,6 +9,10 @@ int main(void) {
   test_png_invalid_inputs_fail_closed();
   test_jpeg_invalid_inputs_fail_closed();
   test_bmp_decode_rgb_1x1();
+  test_bmp_decode_pal8();
+  test_bmp_decode_pal4();
+  test_bmp_decode_pal1();
+  test_bmp_decode_pal8_bad_index();
   test_png_decode_rgb_1x1_with_inflater();
   test_golden_bmp_fixtures();
   test_golden_png_fixtures();

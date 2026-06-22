@@ -36,6 +36,8 @@ int capy_bmp_decode_memory_limited(const uint8_t *data, size_t size,
   uint32_t row_size;
   uint32_t pixel_offset;
   size_t pixel_bytes;
+  const uint8_t *palette;
+  uint32_t palette_count;
   struct capy_image_limits eff;
 
   if (!out) {
@@ -64,7 +66,7 @@ int capy_bmp_decode_memory_limited(const uint8_t *data, size_t size,
     return CAPY_IMAGE_ERR_CORRUPT_DATA;
   }
   bpp = capy_bmp_u16le(data + 28u);
-  if (bpp != 24u && bpp != 32u) {
+  if (bpp != 1u && bpp != 4u && bpp != 8u && bpp != 24u && bpp != 32u) {
     return CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;
   }
   if (capy_bmp_u32le(data + 30u) != 0u) {
@@ -92,6 +94,21 @@ int capy_bmp_decode_memory_limited(const uint8_t *data, size_t size,
   pixel_offset = capy_bmp_u32le(data + 10u);
   if (pixel_offset < 54u || pixel_offset >= size) {
     return CAPY_IMAGE_ERR_TRUNCATED_DATA;
+  }
+  palette = 0;
+  palette_count = 0;
+  if (bpp <= 8u) {
+    uint32_t bi_size = capy_bmp_u32le(data + 14u);
+    uint32_t clr_used = capy_bmp_u32le(data + 46u);
+    size_t pal_off = 14u + (size_t)bi_size;
+    palette_count = clr_used ? clr_used : (1u << bpp);
+    if (palette_count > (1u << bpp)) {
+      return CAPY_IMAGE_ERR_CORRUPT_DATA;
+    }
+    if (pal_off > size || (size_t)palette_count * 4u > size - pal_off) {
+      return CAPY_IMAGE_ERR_TRUNCATED_DATA;
+    }
+    palette = data + pal_off;
   }
   pixel_bytes = (size_t)(uint32_t)width * (size_t)(uint32_t)height *
                 sizeof(uint32_t);
@@ -121,9 +138,32 @@ int capy_bmp_decode_memory_limited(const uint8_t *data, size_t size,
     }
     row = data + row_offset;
     for (int32_t x = 0; x < width; ++x) {
-      uint32_t off = (uint32_t)x * (bpp == 32u ? 4u : 3u);
-      uint32_t pixel = 0xFF000000u | ((uint32_t)row[off + 2u] << 16) |
-                       ((uint32_t)row[off + 1u] << 8) | (uint32_t)row[off];
+      uint32_t pixel;
+      if (bpp >= 24u) {
+        uint32_t off = (uint32_t)x * (bpp == 32u ? 4u : 3u);
+        pixel = 0xFF000000u | ((uint32_t)row[off + 2u] << 16) |
+                ((uint32_t)row[off + 1u] << 8) | (uint32_t)row[off];
+      } else {
+        uint32_t idx;
+        const uint8_t *pe;
+        if (bpp == 8u) {
+          idx = row[(uint32_t)x];
+        } else if (bpp == 4u) {
+          uint8_t pb = row[(uint32_t)x >> 1];
+          idx = ((uint32_t)x & 1u) ? (uint32_t)(pb & 0x0Fu)
+                                   : (uint32_t)(pb >> 4);
+        } else {
+          uint8_t pb = row[(uint32_t)x >> 3];
+          idx = ((uint32_t)pb >> (7u - ((uint32_t)x & 7u))) & 1u;
+        }
+        if (idx >= palette_count) {
+          capy_image_rgba32_free(out);
+          return CAPY_IMAGE_ERR_CORRUPT_DATA;
+        }
+        pe = palette + (size_t)idx * 4u;
+        pixel = 0xFF000000u | ((uint32_t)pe[2] << 16) |
+                ((uint32_t)pe[1] << 8) | (uint32_t)pe[0];
+      }
       out->pixels[y * (uint32_t)width + x] = pixel;
     }
   }

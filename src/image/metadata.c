@@ -41,7 +41,7 @@ static int capy_meta_bmp(const uint8_t *data, size_t size,
     return CAPY_IMAGE_ERR_CORRUPT_DATA;
   }
   bpp = capy_meta_u16le(data + 28u);
-  if (bpp != 24u && bpp != 32u) {
+  if (bpp != 1u && bpp != 4u && bpp != 8u && bpp != 24u && bpp != 32u) {
     return CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;
   }
   if (capy_meta_u32le(data + 30u) != 0u) {
@@ -61,7 +61,7 @@ static int capy_meta_bmp(const uint8_t *data, size_t size,
   m->format = CAPY_IMAGE_FORMAT_BMP;
   m->width = (uint32_t)width;
   m->height = (uint32_t)height;
-  m->channels = bpp / 8u;
+  m->channels = (bpp == 32u) ? 4u : 3u;
   m->bits_per_channel = 8u;
   m->has_alpha = 0u;
   return CAPY_IMAGE_OK;

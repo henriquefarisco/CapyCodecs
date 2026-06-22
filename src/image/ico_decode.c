@@ -67,10 +67,18 @@ static int capy_ico_decode_bmp(const uint8_t *image_data, uint32_t image_size,
   bmp[7] = 0u;
   bmp[8] = 0u;
   bmp[9] = 0u;
-  bmp[10] = 54u;
-  bmp[11] = 0u;
-  bmp[12] = 0u;
-  bmp[13] = 0u;
+  {
+    uint16_t sub_bpp = capy_ico_u16le(image_data + 14u);
+    uint32_t clr_used = capy_ico_u32le(image_data + 32u);
+    uint32_t pal_size = (sub_bpp <= 8u)
+                            ? (clr_used ? clr_used : (1u << sub_bpp)) * 4u
+                            : 0u;
+    uint32_t off_bits = 54u + pal_size;
+    bmp[10] = (uint8_t)(off_bits & 0xFFu);
+    bmp[11] = (uint8_t)((off_bits >> 8) & 0xFFu);
+    bmp[12] = (uint8_t)((off_bits >> 16) & 0xFFu);
+    bmp[13] = (uint8_t)((off_bits >> 24) & 0xFFu);
+  }
   memcpy(bmp + 14, image_data, (size_t)image_size);
   bmp[22] = (uint8_t)((uint32_t)real_height & 0xFFu);
   bmp[23] = (uint8_t)(((uint32_t)real_height >> 8) & 0xFFu);
@@ -100,7 +108,7 @@ static int capy_ico_decode_bmp(const uint8_t *image_data, uint32_t image_size,
             (out->pixels[y * w + x] & 0x00FFFFFFu) | (a << 24);
       }
     }
-  } else {
+  } else if (bpp == 24u) {
     color_row = ((24u * w + 31u) / 32u) * 4u;
     mask_row = ((w + 31u) / 32u) * 4u;
     mask_off = 40u + h * color_row;

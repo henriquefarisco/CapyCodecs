@@ -48,6 +48,10 @@ This ABI covers:
   `capy_{bmp,png,jpeg,qoi}_decode_memory` and the per-call
   `capy_{bmp,png,jpeg,qoi}_decode_memory_limited` variants that accept a
   caller-provided `capy_image_limits`;
+- BMP pixel formats: uncompressed (BI_RGB) 24bpp/32bpp (top-down or
+  bottom-up) and 1/4/8-bit palettized via the RGBQUAD colour table
+  (palettized pixels decode to opaque RGB; an out-of-range palette index
+  fails closed with `CAPY_IMAGE_ERR_CORRUPT_DATA`);
 - format detection (`capy_image_detect_memory` + `enum capy_image_format`,
   covering BMP/PNG/JPEG/QOI plus ICO detection) and generic decode dispatch
   (`capy_image_decode_memory`);
