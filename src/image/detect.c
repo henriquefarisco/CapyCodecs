@@ -50,6 +50,11 @@ int capy_image_detect_memory(const uint8_t *data, size_t size,
     *out_format = CAPY_IMAGE_FORMAT_QOI;
     return CAPY_IMAGE_OK;
   }
+  if (size >= 4u && data[0] == 0x00u && data[1] == 0x00u &&
+      data[2] == 0x01u && data[3] == 0x00u) {
+    *out_format = CAPY_IMAGE_FORMAT_ICO;
+    return CAPY_IMAGE_OK;
+  }
   return CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;
 }
 

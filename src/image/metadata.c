@@ -212,6 +212,75 @@ static int capy_meta_qoi(const uint8_t *data, size_t size,
   return CAPY_IMAGE_OK;
 }
 
+static int capy_meta_ico(const uint8_t *data, size_t size,
+                         struct capy_image_metadata *m) {
+  uint16_t count;
+  uint16_t bpp;
+  uint32_t i;
+  uint32_t best_idx = 0u;
+  uint32_t best_area = 0u;
+  uint32_t width;
+  uint32_t height;
+  uint32_t image_offset;
+  uint32_t image_size;
+  const uint8_t *entry;
+  const uint8_t *image_data;
+  int rc;
+  if (size < 6u) {
+    return CAPY_IMAGE_ERR_TRUNCATED_DATA;
+  }
+  count = capy_meta_u16le(data + 4u);
+  if (count == 0u) {
+    return CAPY_IMAGE_ERR_CORRUPT_DATA;
+  }
+  if (size < 6u + (size_t)count * 16u) {
+    return CAPY_IMAGE_ERR_TRUNCATED_DATA;
+  }
+  for (i = 0u; i < (uint32_t)count; ++i) {
+    entry = data + 6u + (size_t)i * 16u;
+    width = entry[0] == 0u ? 256u : (uint32_t)entry[0];
+    height = entry[1] == 0u ? 256u : (uint32_t)entry[1];
+    if (width * height >= best_area) {
+      best_area = width * height;
+      best_idx = i;
+    }
+  }
+  entry = data + 6u + (size_t)best_idx * 16u;
+  image_offset = capy_meta_u32le(entry + 12u);
+  image_size = capy_meta_u32le(entry + 8u);
+  if (image_size < 4u || image_offset < 6u + (uint32_t)count * 16u ||
+      (size_t)image_offset > size ||
+      (size_t)image_size > size - (size_t)image_offset) {
+    return CAPY_IMAGE_ERR_TRUNCATED_DATA;
+  }
+  image_data = data + image_offset;
+  if (image_data[0] == 0x89u && image_data[1] == 0x50u &&
+      image_data[2] == 0x4Eu && image_data[3] == 0x47u) {
+    rc = capy_meta_png(image_data, image_size, m);
+    if (rc != CAPY_IMAGE_OK) {
+      return rc;
+    }
+    m->format = CAPY_IMAGE_FORMAT_ICO;
+    return CAPY_IMAGE_OK;
+  }
+  if (image_size >= 40u && capy_meta_u32le(image_data) == 40u) {
+    bpp = capy_meta_u16le(image_data + 14u);
+    width = capy_meta_u32le(image_data + 4u);
+    height = capy_meta_u32le(image_data + 8u) / 2u;
+    if (width == 0u || height == 0u) {
+      return CAPY_IMAGE_ERR_CORRUPT_DATA;
+    }
+    m->format = CAPY_IMAGE_FORMAT_ICO;
+    m->width = width;
+    m->height = height;
+    m->channels = (bpp == 32u) ? 4u : 3u;
+    m->bits_per_channel = 8u;
+    m->has_alpha = (bpp == 32u) ? 1u : 0u;
+    return CAPY_IMAGE_OK;
+  }
+  return CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;
+}
+
 int capy_image_query_memory(const uint8_t *data, size_t size,
                             struct capy_image_metadata *out_meta) {
   enum capy_image_format format = CAPY_IMAGE_FORMAT_UNKNOWN;
@@ -238,6 +307,8 @@ int capy_image_query_memory(const uint8_t *data, size_t size,
       return capy_meta_jpeg(data, size, out_meta);
     case CAPY_IMAGE_FORMAT_QOI:
       return capy_meta_qoi(data, size, out_meta);
+    case CAPY_IMAGE_FORMAT_ICO:
+      return capy_meta_ico(data, size, out_meta);
     default:
       return CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;
   }

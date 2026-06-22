@@ -49,10 +49,11 @@ This ABI covers:
   `capy_{bmp,png,jpeg,qoi}_decode_memory_limited` variants that accept a
   caller-provided `capy_image_limits`;
 - format detection (`capy_image_detect_memory` + `enum capy_image_format`,
-  covering BMP/PNG/JPEG/QOI) and generic decode dispatch
+  covering BMP/PNG/JPEG/QOI plus ICO detection) and generic decode dispatch
   (`capy_image_decode_memory`);
 - header-only metadata query (`capy_image_query_memory` +
-  `struct capy_image_metadata`);
+  `struct capy_image_metadata`; for ICO it reports the largest icon's
+  dimensions, with icon pixel decode planned as a follow-up);
 - `capy_image_rgba32` output ownership;
 - allocator injection (no `malloc`/`kalloc`/global heap);
 - PNG inflater injection (no direct CapyOS `tinf` dependency);

@@ -51,6 +51,26 @@ void test_metadata_query(void) {
   test_expect_meta(test_fixture_qoi_ops_6x1, sizeof(test_fixture_qoi_ops_6x1),
                    CAPY_IMAGE_OK, CAPY_IMAGE_FORMAT_QOI, 6u, 1u, 4u, 8u, 1u);
 
+  {
+    /* ICO wrapping a 4x4 32bpp BMP sub-image: BITMAPINFOHEADER height is
+       doubled (8) for the AND mask, so the reported height is 4. */
+    static const uint8_t ico_bmp_4x4_32[] = {
+        0x00u, 0x00u, 0x01u, 0x00u, 0x01u, 0x00u,
+        0x04u, 0x04u, 0x00u, 0x00u, 0x01u, 0x00u, 0x20u, 0x00u,
+        0x28u, 0x00u, 0x00u, 0x00u, 0x16u, 0x00u, 0x00u, 0x00u,
+        0x28u, 0x00u, 0x00u, 0x00u, 0x04u, 0x00u, 0x00u, 0x00u,
+        0x08u, 0x00u, 0x00u, 0x00u, 0x01u, 0x00u, 0x20u, 0x00u,
+        0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+        0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+        0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u};
+    static const uint8_t ico_truncated[] = {0x00u, 0x00u, 0x01u, 0x00u};
+    test_expect_meta(ico_bmp_4x4_32, sizeof(ico_bmp_4x4_32), CAPY_IMAGE_OK,
+                     CAPY_IMAGE_FORMAT_ICO, 4u, 4u, 4u, 8u, 1u);
+    test_expect_meta(ico_truncated, sizeof(ico_truncated),
+                     CAPY_IMAGE_ERR_TRUNCATED_DATA, CAPY_IMAGE_FORMAT_UNKNOWN,
+                     0u, 0u, 0u, 0u, 0u);
+  }
+
   /* Unsupported / malformed headers fail closed with a zeroed metadata. */
   test_expect_meta(test_fixture_bmp_invalid_magic,
                    sizeof(test_fixture_bmp_invalid_magic),

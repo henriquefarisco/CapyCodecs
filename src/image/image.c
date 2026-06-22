@@ -40,6 +40,8 @@ const char *capy_image_format_name(enum capy_image_format format) {
     return "JPEG";
   case CAPY_IMAGE_FORMAT_QOI:
     return "QOI";
+  case CAPY_IMAGE_FORMAT_ICO:
+    return "ICO";
   }
   return "unknown";
 }

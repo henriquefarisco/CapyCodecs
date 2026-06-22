@@ -37,7 +37,8 @@ enum capy_image_format {
   CAPY_IMAGE_FORMAT_BMP = 1,
   CAPY_IMAGE_FORMAT_PNG = 2,
   CAPY_IMAGE_FORMAT_JPEG = 3,
-  CAPY_IMAGE_FORMAT_QOI = 4
+  CAPY_IMAGE_FORMAT_QOI = 4,
+  CAPY_IMAGE_FORMAT_ICO = 5
 };
 
 typedef void *(*capy_image_alloc_fn)(size_t size, void *user_data);

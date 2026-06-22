@@ -40,6 +40,13 @@ void test_detect_formats(void) {
                      sizeof(test_fixture_qoi_1x1_rgb), CAPY_IMAGE_OK,
                      CAPY_IMAGE_FORMAT_QOI);
 
+  {
+    static const uint8_t ico_header[] = {0x00u, 0x00u, 0x01u, 0x00u,
+                                         0x01u, 0x00u};
+    test_expect_detect(ico_header, sizeof(ico_header), CAPY_IMAGE_OK,
+                       CAPY_IMAGE_FORMAT_ICO);
+  }
+
   /* Unknown magic and too-short prefixes fail closed as unsupported. */
   test_expect_detect(test_fixture_bmp_invalid_magic,
                      sizeof(test_fixture_bmp_invalid_magic),
