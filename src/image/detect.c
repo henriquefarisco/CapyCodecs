@@ -80,6 +80,9 @@ int capy_image_decode_memory(const uint8_t *data, size_t size,
                                              out);
     case CAPY_IMAGE_FORMAT_QOI:
       return capy_qoi_decode_memory_limited(data, size, allocator, limits, out);
+    case CAPY_IMAGE_FORMAT_ICO:
+      return capy_ico_decode_memory_limited(data, size, allocator, inflater,
+                                           limits, out);
     default:
       capy_detect_rgba32_reset(out);
       return CAPY_IMAGE_ERR_UNSUPPORTED_FORMAT;

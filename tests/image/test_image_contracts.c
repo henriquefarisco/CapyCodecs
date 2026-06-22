@@ -26,5 +26,9 @@ int main(void) {
   test_metadata_decode_consistency();
   test_qoi_decode();
   test_qoi_failures();
+  test_ico_invalid_inputs_fail_closed();
+  test_ico_decode_bmp_matches_standalone();
+  test_ico_decode_png_subimage();
+  test_ico_negatives();
   return test_failures == 0 ? 0 : 1;
 }

@@ -53,7 +53,10 @@ This ABI covers:
   (`capy_image_decode_memory`);
 - header-only metadata query (`capy_image_query_memory` +
   `struct capy_image_metadata`; for ICO it reports the largest icon's
-  dimensions, with icon pixel decode planned as a follow-up);
+  dimensions, and icon pixel decode (32bpp/24bpp BMP and PNG sub-images,
+  largest entry) is available via `capy_ico_decode_memory` /
+  `capy_ico_decode_memory_limited`, advertised by
+  `CAPY_IMAGE_FEATURE_ICO_DECODE`);
 - `capy_image_rgba32` output ownership;
 - allocator injection (no `malloc`/`kalloc`/global heap);
 - PNG inflater injection (no direct CapyOS `tinf` dependency);

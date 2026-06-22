@@ -20,6 +20,7 @@
 #define CAPY_IMAGE_FEATURE_QOI_DECODE 0x00000400u
 #define CAPY_IMAGE_FEATURE_STRERROR 0x00000800u
 #define CAPY_IMAGE_FEATURE_FORMAT_NAME 0x00001000u
+#define CAPY_IMAGE_FEATURE_ICO_DECODE 0x00002000u
 
 enum capy_image_error {
   CAPY_IMAGE_OK = 0,
@@ -112,6 +113,15 @@ int capy_qoi_decode_memory(const uint8_t *data, size_t size,
                            struct capy_image_rgba32 *out);
 int capy_qoi_decode_memory_limited(const uint8_t *data, size_t size,
                                    const struct capy_image_allocator *allocator,
+                                   const struct capy_image_limits *limits,
+                                   struct capy_image_rgba32 *out);
+int capy_ico_decode_memory(const uint8_t *data, size_t size,
+                           const struct capy_image_allocator *allocator,
+                           const struct capy_image_inflater *inflater,
+                           struct capy_image_rgba32 *out);
+int capy_ico_decode_memory_limited(const uint8_t *data, size_t size,
+                                   const struct capy_image_allocator *allocator,
+                                   const struct capy_image_inflater *inflater,
                                    const struct capy_image_limits *limits,
                                    struct capy_image_rgba32 *out);
 int capy_image_detect_memory(const uint8_t *data, size_t size,
