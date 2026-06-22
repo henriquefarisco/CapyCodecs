@@ -29,6 +29,8 @@ int main(void) {
   test_ico_invalid_inputs_fail_closed();
   test_ico_decode_bmp_matches_standalone();
   test_ico_decode_png_subimage();
+  test_ico_decode_bmp_32bpp_alpha();
+  test_ico_decode_bmp_24bpp_and_mask();
   test_ico_negatives();
   return test_failures == 0 ? 0 : 1;
 }

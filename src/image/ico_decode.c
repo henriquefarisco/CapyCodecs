@@ -38,6 +38,12 @@ static int capy_ico_decode_bmp(const uint8_t *image_data, uint32_t image_size,
   uint8_t *bmp;
   size_t bmp_size;
   int rc;
+  uint16_t bpp;
+  uint32_t w;
+  uint32_t h;
+  uint32_t color_row;
+  uint32_t mask_row;
+  uint32_t mask_off;
   if (image_size < 40u) {
     return CAPY_IMAGE_ERR_TRUNCATED_DATA;
   }
@@ -72,7 +78,47 @@ static int capy_ico_decode_bmp(const uint8_t *image_data, uint32_t image_size,
   bmp[25] = (uint8_t)(((uint32_t)real_height >> 24) & 0xFFu);
   rc = capy_bmp_decode_memory_limited(bmp, bmp_size, allocator, limits, out);
   allocator->free(bmp, allocator->user_data);
-  return rc;
+  if (rc != CAPY_IMAGE_OK) {
+    return rc;
+  }
+  /* capy_bmp_decode emits opaque pixels; restore the icon transparency it
+   * drops. A 32bpp icon carries a per-pixel alpha byte; a lower-depth icon
+   * uses the trailing 1-bit AND mask (a set bit means transparent). Output
+   * rows are top-down while the source is bottom-up, matching capy_bmp_decode.
+   */
+  bpp = capy_ico_u16le(image_data + 14u);
+  w = out->width;
+  h = out->height;
+  if (bpp == 32u) {
+    uint32_t y;
+    for (y = 0u; y < h; ++y) {
+      uint32_t src_y = h - 1u - y;
+      uint32_t x;
+      for (x = 0u; x < w; ++x) {
+        uint32_t a = image_data[40u + src_y * (w * 4u) + x * 4u + 3u];
+        out->pixels[y * w + x] =
+            (out->pixels[y * w + x] & 0x00FFFFFFu) | (a << 24);
+      }
+    }
+  } else {
+    color_row = ((24u * w + 31u) / 32u) * 4u;
+    mask_row = ((w + 31u) / 32u) * 4u;
+    mask_off = 40u + h * color_row;
+    if ((size_t)mask_off + (size_t)h * (size_t)mask_row <= (size_t)image_size) {
+      uint32_t y;
+      for (y = 0u; y < h; ++y) {
+        uint32_t src_y = h - 1u - y;
+        uint32_t x;
+        for (x = 0u; x < w; ++x) {
+          uint32_t mbyte = image_data[mask_off + src_y * mask_row + (x >> 3)];
+          uint32_t transparent = (mbyte >> (7u - (x & 7u))) & 1u;
+          out->pixels[y * w + x] = (out->pixels[y * w + x] & 0x00FFFFFFu) |
+                                   (transparent ? 0x00000000u : 0xFF000000u);
+        }
+      }
+    }
+  }
+  return CAPY_IMAGE_OK;
 }
 
 int capy_ico_decode_memory_limited(const uint8_t *data, size_t size,

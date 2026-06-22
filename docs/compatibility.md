@@ -56,7 +56,8 @@ This ABI covers:
   dimensions, and icon pixel decode (32bpp/24bpp BMP and PNG sub-images,
   largest entry) is available via `capy_ico_decode_memory` /
   `capy_ico_decode_memory_limited`, advertised by
-  `CAPY_IMAGE_FEATURE_ICO_DECODE`);
+  `CAPY_IMAGE_FEATURE_ICO_DECODE`; transparency is honoured - the 32bpp
+  alpha channel and the 1-bit AND mask for lower depths);
 - `capy_image_rgba32` output ownership;
 - allocator injection (no `malloc`/`kalloc`/global heap);
 - PNG inflater injection (no direct CapyOS `tinf` dependency);

@@ -1,6 +1,6 @@
 # CapyCodecs
 
-Version: 0.0.10
+Version: 0.0.11
 
 CapyCodecs owns portable image codec contracts for CapyOS services.
 

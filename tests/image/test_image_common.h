@@ -60,6 +60,8 @@ void test_qoi_failures(void);
 void test_ico_invalid_inputs_fail_closed(void);
 void test_ico_decode_bmp_matches_standalone(void);
 void test_ico_decode_png_subimage(void);
+void test_ico_decode_bmp_32bpp_alpha(void);
+void test_ico_decode_bmp_24bpp_and_mask(void);
 void test_ico_negatives(void);
 
 #endif
