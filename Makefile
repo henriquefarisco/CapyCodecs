@@ -12,6 +12,11 @@ CAPY_PKG_NAME := org.capyos.codecs.image-basic
 CAPY_PKG_VERSION := $(shell cat VERSION)
 CAPY_PKG_SUMMARY := CapyCodecs portable BMP/PNG/JPEG decoders
 CAPY_PKG_INSTALL_ROOT := /var/capypkg/$(CAPY_PKG_NAME)
+CAPY_PKG_PROVIDES_ABI := capy-codec-image
+CAPY_PKG_ABI_VERSION := 2
+CAPY_PKG_CORE_ABI_MIN := 3
+CAPY_PKG_CORE_ABI_MAX := 3
+CAPY_PKG_KNOWN_GOOD := 1
 CAPY_PKG_DEPENDS :=
 PUBLISH_URL_BASE ?= https://github.com/henriquefarisco/CapyCodecs/releases/download/v$(CAPY_PKG_VERSION)
 CAPY_PKG_DIR := $(BUILD_DIR)/capypkg
@@ -34,15 +39,15 @@ test: $(TEST_BIN)
 
 lint:
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsyntax-only $(SRC) $(TEST_SRC)
-	git diff --check
-	test "$$(cat VERSION)" = "0.0.12"
+	git -c core.whitespace=cr-at-eol diff --check
+	test "$$(tr -d '\r\n' < VERSION)" = "0.0.13"
 
 security:
 	$(CC) $(CPPFLAGS) $(CFLAGS) -D_FORTIFY_SOURCE=2 -fstack-protector-strong -fPIE -fsyntax-only $(SRC)
 
 version-check:
-	test "$$(cat VERSION)" = "0.0.12"
-	grep -q "Version: 0.0.12" README.md
+	test "$$(tr -d '\r\n' < VERSION)" = "0.0.13"
+	grep -q "Version: 0.0.13" README.md
 
 validate: lint security test version-check
 
@@ -71,6 +76,11 @@ $(CAPY_PKG_MANIFEST): $(CAPY_PKG_BIN)
 	  echo "payload_sha256=$$SHA" ; \
 	  echo "payload_size=$$SIZE" ; \
 	  echo "install_root=$(CAPY_PKG_INSTALL_ROOT)" ; \
+	  echo "provides_abi=$(CAPY_PKG_PROVIDES_ABI)" ; \
+	  echo "abi_version=$(CAPY_PKG_ABI_VERSION)" ; \
+	  echo "core_abi_min=$(CAPY_PKG_CORE_ABI_MIN)" ; \
+	  echo "core_abi_max=$(CAPY_PKG_CORE_ABI_MAX)" ; \
+	  echo "known_good=$(CAPY_PKG_KNOWN_GOOD)" ; \
 	  echo "depends=$(CAPY_PKG_DEPENDS)" ; \
 	  echo "---" ; \
 	} > $@
