@@ -4,8 +4,11 @@ CPPFLAGS ?=
 LDFLAGS ?=
 BUILD_DIR := build
 SRC := src/image/image.c src/image/bmp_decode.c src/image/png_decode.c src/image/jpeg_decode.c src/image/detect.c src/image/metadata.c src/image/qoi_decode.c src/image/ico_decode.c
+SRC_AUDIO := src/audio/audio.c src/audio/wav_decode.c
 TEST_SRC := tests/image/test_image_contracts.c tests/image/test_image_common.c tests/image/test_image_abi.c tests/image/test_image_lifecycle.c tests/image/test_bmp.c tests/image/test_png.c tests/image/test_jpeg.c tests/image/test_golden.c tests/image/test_negative.c tests/image/test_alloc_failures.c tests/image/test_inflater_failures.c tests/image/test_limits.c tests/image/test_detect.c tests/image/test_metadata.c tests/image/test_qoi.c tests/image/test_ico.c
 TEST_BIN := $(BUILD_DIR)/test_image_contracts
+AUDIO_TEST_SRC := tests/audio/test_audio_contracts.c
+AUDIO_TEST_BIN := $(BUILD_DIR)/test_audio_contracts
 
 # capypkg packaging (Etapa 9 alpha)
 CAPY_PKG_NAME := org.capyos.codecs.image-basic
@@ -22,6 +25,13 @@ PUBLISH_URL_BASE ?= https://github.com/henriquefarisco/CapyCodecs/releases/downl
 CAPY_PKG_DIR := $(BUILD_DIR)/capypkg
 CAPY_PKG_BIN := $(CAPY_PKG_DIR)/$(CAPY_PKG_NAME)-$(CAPY_PKG_VERSION).bin
 CAPY_PKG_MANIFEST := $(CAPY_PKG_DIR)/$(CAPY_PKG_NAME).manifest
+AUDIO_PKG_NAME := org.capyos.codecs.audio-wav
+AUDIO_PKG_SUMMARY := CapyCodecs portable bounded WAV PCM decoder
+AUDIO_PKG_INSTALL_ROOT := /var/capypkg/$(AUDIO_PKG_NAME)
+AUDIO_PKG_PROVIDES_ABI := capy-codec-audio
+AUDIO_PKG_ABI_VERSION := 1
+AUDIO_PKG_BIN := $(CAPY_PKG_DIR)/$(AUDIO_PKG_NAME)-$(CAPY_PKG_VERSION).bin
+AUDIO_PKG_MANIFEST := $(CAPY_PKG_DIR)/$(AUDIO_PKG_NAME).manifest
 
 .PHONY: all clean lint security test validate version-check package package-clean
 
@@ -34,33 +44,39 @@ $(TEST_BIN): $(SRC) $(TEST_SRC) tests/image/test_image_common.h tests/fixtures/i
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Isrc/image $(SRC) $(TEST_SRC) $(LDFLAGS) -o $@
 	chmod 755 $@
 
-test: $(TEST_BIN)
+$(AUDIO_TEST_BIN): $(SRC_AUDIO) $(AUDIO_TEST_SRC) src/audio/capy_audio.h | $(BUILD_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Isrc/audio $(SRC_AUDIO) $(AUDIO_TEST_SRC) $(LDFLAGS) -o $@
+	chmod 755 $@
+
+test: $(TEST_BIN) $(AUDIO_TEST_BIN)
 	$(TEST_BIN)
+	$(AUDIO_TEST_BIN)
 
 lint:
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsyntax-only $(SRC) $(TEST_SRC)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Isrc/audio -fsyntax-only $(SRC_AUDIO) $(AUDIO_TEST_SRC)
 	git -c core.whitespace=cr-at-eol diff --check
-	test "$$(tr -d '\r\n' < VERSION)" = "0.0.13"
+	test "$$(tr -d '\r\n' < VERSION)" = "0.1.0"
 
 security:
-	$(CC) $(CPPFLAGS) $(CFLAGS) -D_FORTIFY_SOURCE=2 -fstack-protector-strong -fPIE -fsyntax-only $(SRC)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -D_FORTIFY_SOURCE=2 -fstack-protector-strong -fPIE -fsyntax-only $(SRC) $(SRC_AUDIO)
 
 version-check:
-	test "$$(tr -d '\r\n' < VERSION)" = "0.0.13"
-	grep -q "Version: 0.0.13" README.md
+	test "$$(tr -d '\r\n' < VERSION)" = "0.1.0"
+	grep -q "Version: 0.1.0" README.md
 
 validate: lint security test version-check
 
 # package: build the artefact + manifest the in-tree CapyOS adapter
 # consumes (see CapyOS/docs/reference/integration/capypkg-publisher-manifest-format.md).
-package: $(CAPY_PKG_MANIFEST)
+package: $(CAPY_PKG_MANIFEST) $(AUDIO_PKG_MANIFEST)
 
 $(CAPY_PKG_BIN): $(SRC) | $(BUILD_DIR)
 	@mkdir -p $(CAPY_PKG_DIR)
 	@tar --format=ustar --owner=0 --group=0 --numeric-owner \
 	     --mtime='@0' --sort=name \
-	     -cf $@ src docs VERSION 2>/dev/null || \
-	  tar -cf $@ src docs VERSION
+	     -cf $@ src/image docs VERSION 2>/dev/null || \
+	  tar -cf $@ src/image docs VERSION
 	@echo "[package] $@"
 
 $(CAPY_PKG_MANIFEST): $(CAPY_PKG_BIN)
@@ -78,6 +94,37 @@ $(CAPY_PKG_MANIFEST): $(CAPY_PKG_BIN)
 	  echo "install_root=$(CAPY_PKG_INSTALL_ROOT)" ; \
 	  echo "provides_abi=$(CAPY_PKG_PROVIDES_ABI)" ; \
 	  echo "abi_version=$(CAPY_PKG_ABI_VERSION)" ; \
+	  echo "core_abi_min=$(CAPY_PKG_CORE_ABI_MIN)" ; \
+	  echo "core_abi_max=$(CAPY_PKG_CORE_ABI_MAX)" ; \
+	  echo "known_good=$(CAPY_PKG_KNOWN_GOOD)" ; \
+	  echo "depends=$(CAPY_PKG_DEPENDS)" ; \
+	  echo "---" ; \
+	} > $@
+	@echo "[package] manifest: $@"
+
+$(AUDIO_PKG_BIN): $(SRC_AUDIO) | $(BUILD_DIR)
+	@mkdir -p $(CAPY_PKG_DIR)
+	@tar --format=ustar --owner=0 --group=0 --numeric-owner \
+	     --mtime='@0' --sort=name \
+	     -cf $@ src/audio docs VERSION 2>/dev/null || \
+	  tar -cf $@ src/audio docs VERSION
+	@echo "[package] $@"
+
+$(AUDIO_PKG_MANIFEST): $(AUDIO_PKG_BIN)
+	@SHA=$$(shasum -a 256 $(AUDIO_PKG_BIN) 2>/dev/null | awk '{print $$1}' | tr 'A-F' 'a-f') ; \
+	if [ -z "$$SHA" ]; then SHA=$$(sha256sum $(AUDIO_PKG_BIN) | awk '{print $$1}' | tr 'A-F' 'a-f'); fi ; \
+	SIZE=$$(wc -c < $(AUDIO_PKG_BIN) | tr -d ' ') ; \
+	URL="$(PUBLISH_URL_BASE)/$(AUDIO_PKG_NAME)-$(CAPY_PKG_VERSION).bin" ; \
+	{ \
+	  echo "name=$(AUDIO_PKG_NAME)" ; \
+	  echo "version=$(CAPY_PKG_VERSION)" ; \
+	  echo "summary=$(AUDIO_PKG_SUMMARY)" ; \
+	  echo "payload_url=$$URL" ; \
+	  echo "payload_sha256=$$SHA" ; \
+	  echo "payload_size=$$SIZE" ; \
+	  echo "install_root=$(AUDIO_PKG_INSTALL_ROOT)" ; \
+	  echo "provides_abi=$(AUDIO_PKG_PROVIDES_ABI)" ; \
+	  echo "abi_version=$(AUDIO_PKG_ABI_VERSION)" ; \
 	  echo "core_abi_min=$(CAPY_PKG_CORE_ABI_MIN)" ; \
 	  echo "core_abi_max=$(CAPY_PKG_CORE_ABI_MAX)" ; \
 	  echo "known_good=$(CAPY_PKG_KNOWN_GOOD)" ; \
