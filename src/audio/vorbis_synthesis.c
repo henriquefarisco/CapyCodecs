@@ -50,7 +50,7 @@ int capy_vorbis_synthesis_finish(
   if (channels > SIZE_MAX / bins || channels > SIZE_MAX / n ||
       spectrum_capacity < channels * bins ||
       previous_capacity < channels * CAPY_VORBIS_BLOCK_SAMPLES ||
-      work_capacity < channels * n + 3u * n || curve_capacity < bins)
+      curve_capacity < bins)
     return CAPY_AUDIO_ERR_RESOURCE_LIMIT;
   if (state->primed &&
       (!valid_block(state->previous_size) || state->channels != channels))
@@ -60,13 +60,19 @@ int capy_vorbis_synthesis_finish(
   if (frames && channels > SIZE_MAX / frames)
     return CAPY_AUDIO_ERR_RESOURCE_LIMIT;
   size_t samples = frames * channels;
-  if (pcm_capacity < samples || pcm_scratch_capacity < samples)
+  /* A long-to-short overlap can produce more samples than the current block.
+   * Both overlap buffers need that capacity; the window scratch still needs n.
+   * All sizes are bounded by the validated channel and block limits above. */
+  size_t aux_size = frames > n ? frames : n;
+  size_t work_size = channels * n + 2u * aux_size + n;
+  if (pcm_capacity < samples || pcm_scratch_capacity < samples ||
+      work_capacity < work_size)
     return CAPY_AUDIO_ERR_RESOURCE_LIMIT;
 
   size_t spectrum_bytes = channels * bins * sizeof(*spectrum);
   size_t previous_bytes = channels * CAPY_VORBIS_BLOCK_SAMPLES * sizeof(*previous);
   size_t pcm_bytes = samples * sizeof(*pcm);
-  size_t work_bytes = (channels * n + 3u * n) * sizeof(*work);
+  size_t work_bytes = work_size * sizeof(*work);
   if (overlap(spectrum, spectrum_bytes, previous, previous_bytes) ||
       overlap(spectrum, spectrum_bytes, work, work_bytes) ||
       overlap(previous, previous_bytes, work, work_bytes) ||
@@ -90,8 +96,8 @@ int capy_vorbis_synthesis_finish(
 
   float *blocks = work;
   float *aux0 = blocks + channels * n;
-  float *aux1 = aux0 + n;
-  float *aux2 = aux1 + n;
+  float *aux1 = aux0 + aux_size;
+  float *aux2 = aux1 + aux_size;
   int rc = capy_vorbis_inverse_coupling(spectrum, channels * bins, channels,
       bins, bins, mapping->magnitude, mapping->angle, mapping->coupling_steps,
       max_abs, blocks, channels * bins);
@@ -129,7 +135,7 @@ int capy_vorbis_synthesis_finish(
       rc = capy_vorbis_overlap_add(
           previous + (size_t)channel * state->previous_size,
           state->previous_size, blocks + (size_t)channel * n, n, max_abs,
-          aux0, n, aux1, n, &produced);
+          aux0, aux_size, aux1, aux_size, &produced);
       if (rc) return rc;
       if (produced != frames) return CAPY_AUDIO_ERR_CORRUPT_DATA;
       for (size_t frame = 0; frame < frames; ++frame)

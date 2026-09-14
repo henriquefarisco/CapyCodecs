@@ -2,16 +2,24 @@
 import array, math, pathlib, struct, subprocess, sys, tempfile, wave
 
 decoder=pathlib.Path(sys.argv[1]).resolve()
-with tempfile.TemporaryDirectory() as td:
+
+def compare_fixture(td, name, frames, transients):
     root=pathlib.Path(td); wav=root/'source.wav'; ogg=root/'source.ogg'
     ours=root/'ours.f32'; reference=root/'reference.f32'
-    rate=48000; frames=12000
+    rate=48000
     with wave.open(str(wav),'wb') as f:
         f.setnchannels(2); f.setsampwidth(2); f.setframerate(rate)
         data=bytearray()
         for i in range(frames):
             left=round(12000*math.sin(2*math.pi*440*i/rate))
             right=round(9000*math.sin(2*math.pi*997*i/rate))
+            if transients:
+                # Sharp attacks force long/short mode switches, absent from
+                # the steady-tone fixture that originally missed this bug.
+                left=int(5000*math.sin(2*math.pi*440*i/rate))
+                if i in (9600, 24000, 38400):
+                    left=30000
+                right=-left
             data += struct.pack('<hh',left,right)
         f.writeframes(data)
     subprocess.run(['oggenc','-Q','-q','4','-o',str(ogg),str(wav)],check=True)
@@ -39,4 +47,9 @@ with tempfile.TemporaryDirectory() as td:
     error=sum(abs(a[aa+i]-b[bb+i]) for i in range(count))/count
     peak=max(abs(a[aa+i]-b[bb+i]) for i in range(count))
     assert count >= (frames-256)*2 and error < 2.5e-4 and peak < 3e-3, (error,peak,offset,len(a),len(b))
-    print(f'[vorbis-pcm-reference] real Ogg matched: mean={error:.3g} peak={peak:.3g} offset={offset} frames={count//2}')
+    print(f'[vorbis-pcm-reference] {name} Ogg matched: mean={error:.3g} peak={peak:.3g} offset={offset} frames={count//2}')
+
+for name, frames, transients in (('tones', 12000, False),
+                                  ('transients', 48000, True)):
+    with tempfile.TemporaryDirectory() as td:
+        compare_fixture(td, name, frames, transients)

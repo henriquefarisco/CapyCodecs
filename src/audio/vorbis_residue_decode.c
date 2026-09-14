@@ -25,12 +25,16 @@ static int config_valid(const struct capy_vorbis_residue_config *config,
 static int classify(const struct capy_vorbis_residue_config *config,
                     const struct capy_vorbis_huffman *trees,
                     struct capy_vorbis_bits *audio, uint8_t *classes,
-                    size_t at, size_t count) {
+                    size_t at, size_t count, size_t dimensions) {
   uint32_t word;
   int rc = capy_vorbis_huffman_decode(&trees[config->classbook], audio, &word);
   if (rc) return rc;
-  for (size_t i = count; i; --i) {
-    classes[at + i - 1u] = (uint8_t)(word % config->classifications);
+  /* A final partial group uses the prefix of the full classbook word, not
+   * its least-significant digits. Discard the unused suffix without writing
+   * beyond the caller's exact partition-sized classification scratch. */
+  for (size_t i = dimensions; i; --i) {
+    if (i <= count)
+      classes[at + i - 1u] = (uint8_t)(word % config->classifications);
     word /= config->classifications;
   }
   return 0;
@@ -113,7 +117,8 @@ int capy_vorbis_residue_decode(
       size_t class_slot = 0;
       if (config->type == 2u) {
         if (pass == 0) {
-          int rc = classify(config, trees, audio, classes, partition, group);
+          int rc = classify(config, trees, audio, classes, partition, group,
+                            classwords);
           if (rc == CAPY_AUDIO_ERR_TRUNCATED_DATA) goto exhausted;
           if (rc) return rc;
         }
@@ -122,7 +127,8 @@ int capy_vorbis_residue_decode(
           if (skip[channel]) continue;
           if (pass == 0) {
             int rc = classify(config, trees, audio, classes,
-                              class_slot * partitions + partition, group);
+                              class_slot * partitions + partition, group,
+                              classwords);
             if (rc == CAPY_AUDIO_ERR_TRUNCATED_DATA) goto exhausted;
             if (rc) return rc;
           }

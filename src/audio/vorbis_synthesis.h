@@ -22,8 +22,10 @@ struct capy_vorbis_synthesis_result {
  *
  * `previous` is dense channel-major storage with capacity channels*8192. Once
  * primed, block overlap is bound to the original channel count.
- * `work` needs channels*block_size + 3*block_size floats. `pcm_scratch` needs
- * the same number of interleaved floats as `pcm`; `curve` needs block_size/2
+ * Let n=block_size and frames=previous_size/4+n/4 when primed, otherwise zero.
+ * `work` needs (channels+1)*n + 2*max(n,frames) floats. Allocating
+ * (channels+3)*the_stream_maximum_block_size is sufficient for every packet.
+ * `pcm` and `pcm_scratch` each need frames*channels floats; `curve` needs n/2
  * bytes. All mutable buffers must be distinct. The first packet primes overlap
  * state and intentionally produces zero frames. */
 int capy_vorbis_synthesis_finish(
