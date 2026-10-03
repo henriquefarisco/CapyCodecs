@@ -11,13 +11,15 @@ static int config_valid(const struct capy_vorbis_residue_config *config,
   if (!config || config->type > 2u || config->end < config->begin ||
       !config->partition_size || !config->classifications ||
       config->classifications > CAPY_VORBIS_RESIDUE_CLASSES ||
-      config->classbook >= book_count)
+      config->classbook >= book_count) {
     return 0;
+  }
   for (unsigned c = 0; c < config->classifications; ++c)
     for (unsigned pass = 0; pass < CAPY_VORBIS_RESIDUE_PASSES; ++pass) {
       int book = config->books[c][pass];
-      if (book < -1 || (book >= 0 && (size_t)book >= book_count)) return 0;
-      if (((config->cascade[c] >> pass) & 1u) != (book >= 0)) return 0;
+      if (config->cascade[c] & (1u << pass)) {
+        if (book < 0 || (size_t)book >= book_count) return 0;
+      } else if (book != -1) return 0;
     }
   return 1;
 }
@@ -61,8 +63,9 @@ int capy_vorbis_residue_decode(
       !setup_size || !audio || !audio->data || audio->position > audio->bit_count ||
       !channels || channels > CAPY_AUDIO_MAX_CHANNELS || !skip || !bins ||
       bins > CAPY_VORBIS_FLOOR1_BINS || !(max_abs > 0.0f && max_abs <= FLT_MAX) ||
-      !out || !scratch || !classes || !config_valid(config, book_count))
+      !out || !scratch || !classes || !config_valid(config, book_count)) {
     return CAPY_AUDIO_ERR_INVALID_ARGUMENT;
+  }
 
   size_t total = (size_t)channels * bins;
   if (out_capacity < total || scratch_capacity < total)

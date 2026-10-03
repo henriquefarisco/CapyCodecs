@@ -26,5 +26,9 @@ int capy_ogg_reader_init(struct capy_ogg_reader *reader,
  * must be supplied on every call. Output length is zero on EOF/error. */
 int capy_ogg_reader_next(struct capy_ogg_reader *reader, uint8_t *scratch,
                          size_t capacity, size_t *packet_size);
+/* Consume and validate a complete packet, retaining only its bounded prefix.
+ * packet_size is the full length, NOT the number of bytes copied. */
+int capy_ogg_reader_next_prefix(struct capy_ogg_reader *reader, uint8_t *scratch,
+                                size_t capacity, size_t *packet_size);
 
 #endif

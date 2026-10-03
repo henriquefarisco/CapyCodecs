@@ -63,6 +63,12 @@ int main(void) {
   assert(capy_ogg_reader_next(&r, scratch, 1024, &length) == 1);
   assert(length == 3 && memcmp(scratch, "abc", 3) == 0);
   assert(capy_ogg_reader_next(&r, scratch, 1024, &length) == 0);
+  init(&r, sizeof(golden), 1024, 8);
+  uint8_t prefix_guard[4] = {0xaa, 0xaa, 0xaa, 0xaa};
+  assert(capy_ogg_reader_next_prefix(&r, prefix_guard + 1, 1, &length) == 1);
+  assert(length == 3 && prefix_guard[1] == 'a');
+  assert(prefix_guard[0] == 0xaa && prefix_guard[2] == 0xaa && prefix_guard[3] == 0xaa);
+  assert(capy_ogg_reader_next_prefix(&r, prefix_guard + 1, 1, &length) == 0);
   const uint8_t multi[] = {0, 255, 0, 3};
   n = page(0, 6, 0, multi, sizeof(multi));
   put64(bytes + 6, UINT64_C(0x1020304050607080)); checksum(bytes, n);
@@ -116,6 +122,12 @@ int main(void) {
   n = first + page(first, 1, 1, full, 1);
   n += page(n, 5, 2, tail, 2);
   assert(drain(n, 510, 3) == 0);
+  init(&r, n, 1024, 3);
+  uint8_t prefix[32];
+  assert(capy_ogg_reader_next_prefix(&r, prefix, sizeof(prefix), &length) == 1);
+  assert(length == 510);
+  for (unsigned i = 0; i < sizeof(prefix); ++i) assert(prefix[i] == i);
+  assert(capy_ogg_reader_next_prefix(&r, prefix, sizeof(prefix), &length) == 1 && length == 2);
   assert(drain(n, 509, 3) == CAPY_AUDIO_ERR_RESOURCE_LIMIT);
   assert(capy_ogg_reader_init(&r, bytes, n, n - 1, 1024, 8) == CAPY_AUDIO_ERR_RESOURCE_LIMIT);
   assert(capy_ogg_reader_next(&r, scratch, 1024, &length) == CAPY_AUDIO_ERR_RESOURCE_LIMIT);

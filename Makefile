@@ -4,7 +4,8 @@ CPPFLAGS ?=
 LDFLAGS ?=
 BUILD_DIR := build
 SRC := src/image/image.c src/image/bmp_decode.c src/image/png_decode.c src/image/jpeg_decode.c src/image/detect.c src/image/metadata.c src/image/qoi_decode.c src/image/ico_decode.c
-SRC_AUDIO := src/audio/audio.c src/audio/wav_decode.c
+include src/audio/sources.mk
+SRC_AUDIO := $(addprefix src/audio/,$(CAPY_AUDIO_SOURCE_NAMES))
 TEST_SRC := tests/image/test_image_contracts.c tests/image/test_image_common.c tests/image/test_image_abi.c tests/image/test_image_lifecycle.c tests/image/test_bmp.c tests/image/test_png.c tests/image/test_jpeg.c tests/image/test_golden.c tests/image/test_negative.c tests/image/test_alloc_failures.c tests/image/test_inflater_failures.c tests/image/test_limits.c tests/image/test_detect.c tests/image/test_metadata.c tests/image/test_qoi.c tests/image/test_ico.c
 TEST_BIN := $(BUILD_DIR)/test_image_contracts
 AUDIO_TEST_SRC := tests/audio/test_audio_contracts.c
@@ -199,14 +200,14 @@ lint:
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Isrc/audio -fsyntax-only tests/audio/test_vorbis_synthesis.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Isrc/audio -fsyntax-only tests/audio/test_vorbis_audio_packet.c
 	git -c core.whitespace=cr-at-eol diff --check
-	test "$$(tr -d '\r\n' < VERSION)" = "0.1.0"
+	test "$$(tr -d '\r\n' < VERSION)" = "0.1.1"
 
 security:
 	$(CC) $(CPPFLAGS) $(CFLAGS) -D_FORTIFY_SOURCE=2 -fstack-protector-strong -fPIE -fsyntax-only $(SRC) $(SRC_AUDIO) $(OGG_SRC) $(VORBIS_SRC)
 
 version-check:
-	test "$$(tr -d '\r\n' < VERSION)" = "0.1.0"
-	grep -q "Version: 0.1.0" README.md
+	test "$$(tr -d '\r\n' < VERSION)" = "0.1.1"
+	grep -q "Version: 0.1.1" README.md
 
 validate: lint security test version-check
 
@@ -214,6 +215,12 @@ validate: lint security test version-check
 .PHONY: vorbis-reference-test
 .PHONY: vorbis-benchmark
 .PHONY: vorbis-pcm-reference-test
+.PHONY: vorbis-decode-test
+$(BUILD_DIR)/test_vorbis_decode: $(SRC_AUDIO) $(VORBIS_HEADERS) src/audio/vorbis_decode.h tests/audio/test_vorbis_decode.c | $(BUILD_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Isrc/audio $(SRC_AUDIO) tests/audio/test_vorbis_decode.c $(LDFLAGS) -o $@
+
+vorbis-decode-test: $(BUILD_DIR)/test_vorbis_decode
+	python3 -B tests/audio/test_vorbis_decode_reference.py $(BUILD_DIR)/test_vorbis_decode
 vorbis-benchmark: $(BUILD_DIR)/bench_vorbis_primitives
 
 $(BUILD_DIR)/bench_vorbis_primitives: src/audio/vorbis_codebook.c src/audio/vorbis_vq.c src/audio/vorbis_floor1.c src/audio/vorbis_window.c src/audio/vorbis_mdct.c src/audio/vorbis_codebook.h src/audio/vorbis_vq.h src/audio/vorbis_floor1.h src/audio/vorbis_window.h src/audio/vorbis_mdct.h tests/audio/bench_vorbis_primitives.c | $(BUILD_DIR)

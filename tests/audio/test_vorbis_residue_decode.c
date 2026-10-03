@@ -150,6 +150,31 @@ int main(void) {
       classes, 8, &result) == CAPY_AUDIO_ERR_INVALID_ARGUMENT);
   assert(memcmp(before, out, sizeof(out)) == 0);
 
-  puts("[vorbis-residue-decode] types 0/1/2, partial classwords, skip, exhaustion and failures passed");
+  /* Every cascade bit must agree with its signed book sentinel. Exercise the
+   * exact optimized object as well: GCC 13.2 miscompiled the former combined
+   * signed-range/boolean comparison in the kernel cross build. */
+  skip[0] = skip[1] = 1;
+  for (unsigned mask = 0; mask < 256; ++mask) {
+    config(&cfg, 1, 4, 4);
+    cfg.cascade[0] = (uint8_t)mask;
+    for (unsigned pass = 0; pass < 8; ++pass)
+      cfg.books[0][pass] = (mask & (1u << pass)) ? 1 : -1;
+    bits = reader(audio_data, 0);
+    assert(capy_vorbis_residue_decode(&cfg, books, trees, 2, setup, 2,
+        &bits, 2, skip, 4, 8, 100, out, 8, scratch, 16,
+        classes, 8, &result) == 0);
+    for (unsigned pass = 0; pass < 8; ++pass) {
+      int16_t saved = cfg.books[0][pass];
+      const int16_t invalid[] = {saved < 0 ? 1 : -1, -2, 2};
+      for (unsigned i = 0; i < 3; ++i) {
+        cfg.books[0][pass] = invalid[i];
+        assert(capy_vorbis_residue_decode(&cfg, books, trees, 2, setup, 2,
+            &bits, 2, skip, 4, 8, 100, out, 8, scratch, 16,
+            classes, 8, &result) == CAPY_AUDIO_ERR_INVALID_ARGUMENT);
+      }
+      cfg.books[0][pass] = saved;
+    }
+  }
+  puts("[vorbis-residue-decode] types 0/1/2, 256 cascade masks, sentinel/range failures passed");
   return 0;
 }

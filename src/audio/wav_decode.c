@@ -1,4 +1,5 @@
 #include "capy_audio.h"
+#include "vorbis_decode.h"
 
 struct capy_wav_view {
   struct capy_audio_metadata metadata;
@@ -229,6 +230,8 @@ int capy_audio_query_memory(const uint8_t *data, size_t size,
     capy_audio_default_limits(&defaults);
     limits = &defaults;
   }
+  if (data && size >= 4u && wav_fourcc(data, 'O', 'g', 'g', 'S'))
+    return capy_vorbis_query_memory(data, size, limits, out_metadata);
   rc = wav_parse(data, size, limits, &view);
   if (rc == CAPY_AUDIO_OK) {
     *out_metadata = view.metadata;
@@ -254,6 +257,10 @@ int capy_audio_decode_memory_limited(
   if (!limits) {
     capy_audio_default_limits(&defaults);
     limits = &defaults;
+  }
+  if (data && size >= 4u && wav_fourcc(data, 'O', 'g', 'g', 'S')) {
+    const struct capy_vorbis_decode_budget budget = {16u << 20, limits->max_chunks, 16000000};
+    return capy_vorbis_decode_memory(data, size, allocator, limits, &budget, out);
   }
   rc = wav_parse(data, size, limits, &view);
   if (rc != CAPY_AUDIO_OK) {

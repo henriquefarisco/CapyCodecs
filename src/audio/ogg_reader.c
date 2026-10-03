@@ -95,14 +95,12 @@ static int next_page(struct capy_ogg_reader *r) {
   return 0;
 }
 
-int capy_ogg_reader_next(struct capy_ogg_reader *r, uint8_t *scratch,
+static int next_prefix(struct capy_ogg_reader *r, uint8_t *scratch,
                          size_t capacity, size_t *packet_size) {
   if (packet_size) *packet_size = 0;
   if (!r || !scratch || !packet_size) return CAPY_AUDIO_ERR_INVALID_ARGUMENT;
   r->packet_has_granule = 0;
   if (r->error) return r->error;
-  if (capacity < r->max_packet_bytes)
-    return r->error = CAPY_AUDIO_ERR_RESOURCE_LIMIT;
   if (r->ended) return 0;
   for (;;) {
     if (r->segment == r->segments) {
@@ -119,7 +117,7 @@ int capy_ogg_reader_next(struct capy_ogg_reader *r, uint8_t *scratch,
     size_t length = r->laces[r->segment++];
     if (length > r->max_packet_bytes - r->packet_size)
       return r->error = CAPY_AUDIO_ERR_RESOURCE_LIMIT;
-    for (size_t i = 0; i < length; ++i)
+    for (size_t i = 0; i < length && r->packet_size + i < capacity; ++i)
       scratch[r->packet_size + i] = r->data[r->body + i];
     r->body += length;
     r->packet_size += length;
@@ -137,4 +135,19 @@ int capy_ogg_reader_next(struct capy_ogg_reader *r, uint8_t *scratch,
       return 1;
     }
   }
+}
+
+int capy_ogg_reader_next(struct capy_ogg_reader *r, uint8_t *scratch,
+                         size_t capacity, size_t *packet_size) {
+  if (packet_size) *packet_size = 0;
+  if (!r || !scratch || !packet_size) return CAPY_AUDIO_ERR_INVALID_ARGUMENT;
+  if (r->error) return r->error;
+  if (capacity < r->max_packet_bytes)
+    return r->error = CAPY_AUDIO_ERR_RESOURCE_LIMIT;
+  return next_prefix(r, scratch, capacity, packet_size);
+}
+
+int capy_ogg_reader_next_prefix(struct capy_ogg_reader *r, uint8_t *scratch,
+                                size_t capacity, size_t *packet_size) {
+  return next_prefix(r, scratch, capacity, packet_size);
 }

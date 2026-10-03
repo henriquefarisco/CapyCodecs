@@ -31,7 +31,8 @@ uint32_t capy_audio_codec_features(void) {
   return CAPY_AUDIO_FEATURE_WAV_PCM_DECODE |
          CAPY_AUDIO_FEATURE_INTERLEAVED_OUTPUT |
          CAPY_AUDIO_FEATURE_ALLOCATOR_INJECTION |
-         CAPY_AUDIO_FEATURE_PER_CALL_LIMITS | CAPY_AUDIO_FEATURE_METADATA;
+         CAPY_AUDIO_FEATURE_PER_CALL_LIMITS | CAPY_AUDIO_FEATURE_METADATA |
+         CAPY_AUDIO_FEATURE_OGG_VORBIS_DECODE;
 }
 
 void capy_audio_default_limits(struct capy_audio_limits *limits) {
@@ -52,6 +53,11 @@ int capy_audio_detect_memory(const uint8_t *data, size_t size,
     return CAPY_AUDIO_ERR_INVALID_ARGUMENT;
   }
   *out_container = CAPY_AUDIO_CONTAINER_UNKNOWN;
+  if (size >= 4u && data[0] == 'O' && data[1] == 'g' && data[2] == 'g' && data[3] == 'S') {
+    /* Container detection only; query/decode validates Vorbis and page CRCs. */
+    *out_container = CAPY_AUDIO_CONTAINER_OGG_VORBIS;
+    return CAPY_AUDIO_OK;
+  }
   if (size < 12u) {
     return CAPY_AUDIO_ERR_TRUNCATED_DATA;
   }

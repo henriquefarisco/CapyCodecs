@@ -15,6 +15,12 @@ remain portable codec cores with no CapyOS kernel dependency.
 
 ## CapyOS reference version
 
+Local coordinated Etapa 10 acceptance (2026-10-02): version 0.1.1 passed
+`make validate`, exact freestanding-object/reference replay and captured OGG/WAV
+playback in the kernel consumer on QEMU and VMware. See
+[`etapa10-acceptance-20261002.md`](../../CapyOS/docs/operations/etapa10-acceptance-20261002.md).
+Published package pins are unchanged; this is branch integration, not publication.
+
 - CapyOS core pinned for this contract: `0.10.0+20260904`
 - Authoritative cross-repo matrix: [`CapyOS/docs/reference/integration/compatibility-matrix.md`](../../CapyOS/docs/reference/integration/compatibility-matrix.md)
 - Canonical manifest format consumed by the in-tree adapter: [`CapyOS/docs/reference/integration/capypkg-publisher-manifest-format.md`](../../CapyOS/docs/reference/integration/capypkg-publisher-manifest-format.md)
@@ -94,6 +100,29 @@ sample rate, channels and RIFF chunk count. Unsupported compression tags,
 invalid block alignment or byte rate, duplicate required chunks, truncation and
 limit overruns fail closed. Video remains deferred within Etapa 10's optional
 scope.
+
+### Additive Ogg/Vorbis decode in 0.1.1 (unreleased)
+
+`capy-codec-audio` remains ABI v1: no existing layout, signature or number
+changed. `CAPY_AUDIO_FEATURE_OGG_VORBIS_DECODE` and container value 2 advertise
+generic detection/query/decode of one complete Ogg/Vorbis logical stream.
+Output is interleaved S16LE, clipped before conversion; supported entropy and
+synthesis are the existing floor1/mapping0/residue implementations. Unsupported
+features fail closed; chaining/multiplexing and missing EOS are rejected.
+Metadata query verifies the container CRC/framing, header signatures and
+identification, not full setup/entropy decodability.
+
+Input is at most 64 MiB, each packet at most 1 MiB, scratch at most 16 MiB,
+output at most 64 MiB (all also constrained by caller limits). `max_chunks`
+bounds Ogg pages and audio packets; a hard 65536 audio-packet ceiling and
+16 million decoded-vector budget bound work in addition to bounded setup,
+block sizes and channels. No FS/network/libm/global allocator is introduced.
+Allocator failures free all intermediate memory and publish no partial PCM.
+`src/audio/sources.mk` is the owned source inventory for build-time consumers.
+
+The independent reference suite covers steady tones and transient block
+switches, exact frame counts, 21 allocation-failure points, resource rejection,
+truncation and CRC. ASan/UBSan runs are required before consumer acceptance.
 
 CapyCodecs does **not** own:
 
