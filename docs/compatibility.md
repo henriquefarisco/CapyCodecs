@@ -15,7 +15,13 @@ remain portable codec cores with no CapyOS kernel dependency.
 
 ## CapyOS reference version
 
-- CapyOS core pinned for this contract: `0.10.0-alpha.1+20260903`
+Local coordinated Etapa 10 acceptance (2026-10-02): version 0.1.1 passed
+`make validate`, exact freestanding-object/reference replay and captured OGG/WAV
+playback in the kernel consumer on QEMU and VMware. See
+[`etapa10-acceptance-20261002.md`](../../CapyOS/docs/operations/etapa10-acceptance-20261002.md).
+Published package pins are unchanged; this is branch integration, not publication.
+
+- CapyOS core pinned for this contract: `0.10.0+20260904`
 - Authoritative cross-repo matrix: [`CapyOS/docs/reference/integration/compatibility-matrix.md`](../../CapyOS/docs/reference/integration/compatibility-matrix.md)
 - Canonical manifest format consumed by the in-tree adapter: [`CapyOS/docs/reference/integration/capypkg-publisher-manifest-format.md`](../../CapyOS/docs/reference/integration/capypkg-publisher-manifest-format.md)
 - Manual deploy runbook: [`CapyOS/docs/operations/manual-module-deploy-runbook.md`](../../CapyOS/docs/operations/manual-module-deploy-runbook.md)
@@ -40,7 +46,8 @@ remain portable codec cores with no CapyOS kernel dependency.
 
 ## Owned ABI
 
-CapyCodecs currently owns the `capy-codec-image` ABI (v2).
+CapyCodecs currently owns the `capy-codec-image` ABI (v2) and the
+`capy-codec-audio` ABI (v1).
 
 This ABI covers:
 
@@ -84,8 +91,38 @@ default limits) and new feature bits advertise the additions:
 helper and `CAPY_IMAGE_FEATURE_FORMAT_NAME` for the `capy_image_format_name`
 helper. A NULL `limits` argument is treated as "use `capy_image_default_limits`".
 
-Audio and video ABIs will be added in `capy-codec-audio` / `capy-codec-video`
-when Etapa 10 opens.
+`capy-codec-audio` v1 is the first Etapa 10 slice. It provides deterministic
+WAV/PCM detection, metadata query and bounded decode for interleaved signed
+16-bit, packed signed 24-bit, signed 32-bit and float 32-bit little-endian PCM.
+The output is copied into an allocator supplied by the caller and is reset on
+every failure. `capy_audio_limits` caps input bytes, output bytes, frame count,
+sample rate, channels and RIFF chunk count. Unsupported compression tags,
+invalid block alignment or byte rate, duplicate required chunks, truncation and
+limit overruns fail closed. Video remains deferred within Etapa 10's optional
+scope.
+
+### Additive Ogg/Vorbis decode in 0.1.1 (unreleased)
+
+`capy-codec-audio` remains ABI v1: no existing layout, signature or number
+changed. `CAPY_AUDIO_FEATURE_OGG_VORBIS_DECODE` and container value 2 advertise
+generic detection/query/decode of one complete Ogg/Vorbis logical stream.
+Output is interleaved S16LE, clipped before conversion; supported entropy and
+synthesis are the existing floor1/mapping0/residue implementations. Unsupported
+features fail closed; chaining/multiplexing and missing EOS are rejected.
+Metadata query verifies the container CRC/framing, header signatures and
+identification, not full setup/entropy decodability.
+
+Input is at most 64 MiB, each packet at most 1 MiB, scratch at most 16 MiB,
+output at most 64 MiB (all also constrained by caller limits). `max_chunks`
+bounds Ogg pages and audio packets; a hard 65536 audio-packet ceiling and
+16 million decoded-vector budget bound work in addition to bounded setup,
+block sizes and channels. No FS/network/libm/global allocator is introduced.
+Allocator failures free all intermediate memory and publish no partial PCM.
+`src/audio/sources.mk` is the owned source inventory for build-time consumers.
+
+The independent reference suite covers steady tones and transient block
+switches, exact frame counts, 21 allocation-failure points, resource rejection,
+truncation and CRC. ASan/UBSan runs are required before consumer acceptance.
 
 CapyCodecs does **not** own:
 
@@ -145,7 +182,7 @@ the host on bad input.
 | Maximum memory budget per decode | configurable; bounded by injected allocator | caller |
 | Maximum decode time per call | not enforced inside codec; caller responsible for budget via cooperative cancellation | caller |
 | Allowed pixel format output | ARGB32 (8/8/8/8) | CapyCodecs ABI |
-| Audio sample format (future) | TBD when Etapa 10 opens | CapyCodecs / CapyOS |
+| Audio sample format | interleaved S16LE, packed S24LE, S32LE or F32LE; WAV/PCM v1 | CapyCodecs / CapyOS |
 
 All four `capy_image_limits` fields are enforced before any large
 allocation. The default-limit `capy_*_decode_memory` wrappers apply
@@ -214,15 +251,16 @@ The key requirements that affect CapyCodecs are:
 - `payload_sha256` must be lowercase 64 hex of the published artifact;
 - `payload_size` ≤ 1 MiB during the alpha streaming-buffer window;
 - `name` must follow `[a-zA-Z0-9._-]`; suggested canonical name
-  `org.capyos.codecs.image-basic` for the current ABI slice;
+  `org.capyos.codecs.image-basic` and `org.capyos.codecs.audio-wav` for the
+  current ABI slices;
 - `install_root` must live under `/var/capypkg` or `/opt/`;
 - `signature_ed25519` must cover the canonical descriptor
   `name=N|version=V|payload_sha256=H|payload_url=U\n`;
 - `depends` should remain empty until the codec splits into
   sub-packages.
 
-The `CAPY_IMAGE_ABI_VERSION` declared in `src/image/capy_image.h`
-must be reflected in the `required_abis[].minimum_version` field of
+The `CAPY_IMAGE_ABI_VERSION` and `CAPY_AUDIO_ABI_VERSION` declarations must be
+reflected in the `required_abis[].minimum_version` field of
 the high-level JSON index (`CapyAgent` side) but is not consumed by
 the in-tree alpha adapter today.
 
